@@ -22,6 +22,7 @@ import {
 } from "@dnd-kit/sortable";
 import { useRouter } from "next/navigation";
 import {
+  type CSSProperties,
   startTransition,
   useCallback,
   useEffect,
@@ -43,6 +44,7 @@ import { SidebarResizer } from "@/components/sidebar-resizer";
 import { TaskCardBody } from "@/components/task-card";
 import { TaskDialog, type TaskPatch } from "@/components/task-dialog";
 import type { Priority } from "@/db/schema";
+import type { HistoryFact } from "@/lib/history-fact";
 import type {
   ClientBoard,
   ClientBoardData,
@@ -53,9 +55,11 @@ import type {
 export function BoardView({
   data,
   boards,
+  fact,
 }: {
   data: ClientBoardData;
   boards: ClientBoard[];
+  fact: HistoryFact | null;
 }) {
   const router = useRouter();
   const [state, dispatch] = useReducer(boardReducer, data, initBoardState);
@@ -68,6 +72,8 @@ export function BoardView({
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [sideFade, setSideFade] = useState({ left: false, right: false });
 
   // The board id changing means we navigated to another board; a new reducer
   // init is the only way to swap the whole dataset out.
@@ -140,6 +146,25 @@ export function BoardView({
     }
     return byColumn;
   }, [filters, state.columnOrder, state.taskOrder, state.tasks]);
+
+  // Soften whichever side of the board has columns scrolled past it.
+  const measureSides = useCallback(() => {
+    const el = boardRef.current;
+    if (!el) return;
+    setSideFade({
+      left: el.scrollLeft > 2,
+      right: el.scrollWidth - el.scrollLeft - el.clientWidth > 2,
+    });
+  }, []);
+
+  useEffect(() => {
+    measureSides();
+    const el = boardRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measureSides);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measureSides, state.columnOrder.length]);
 
   /**
    * Sidebar counts deliberately ignore the context filter — a row has to show
@@ -475,6 +500,12 @@ export function BoardView({
     }, "Couldn't add that column");
   };
 
+  /** New cards go to the featured column, falling back to the first. */
+  const startNewTask = useCallback(() => {
+    const focused = state.columnOrder.find((id) => state.columns[id]?.isFocus);
+    setComposeColumnId(focused ?? state.columnOrder[0] ?? null);
+  }, [state.columnOrder, state.columns]);
+
   // ------------------------------------------------------------- shortcuts
 
   useEffect(() => {
@@ -489,6 +520,18 @@ export function BoardView({
         e.preventDefault();
         searchRef.current?.focus();
         searchRef.current?.select();
+        return;
+      }
+
+      // ⌘N / ⌃N / ⌥N for a new task. Checked before the typing guard so it works
+      // from a field, though a browser may keep ⌘N for itself — see `n` below,
+      // which always reaches us.
+      if (
+        (e.metaKey || e.ctrlKey || e.altKey) &&
+        (e.key.toLowerCase() === "n" || e.code === "KeyN")
+      ) {
+        e.preventDefault();
+        startNewTask();
         return;
       }
 
@@ -508,7 +551,7 @@ export function BoardView({
       }
       if (e.key === "n" && !openTaskId) {
         e.preventDefault();
-        setComposeColumnId(state.columnOrder[0] ?? null);
+        startNewTask();
       }
       if (e.key === "Escape") {
         setComposeColumnId(null);
@@ -517,7 +560,7 @@ export function BoardView({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [openTaskId, state.columnOrder]);
+  }, [openTaskId, startNewTask]);
 
   useEffect(() => {
     if (!error) return;
@@ -538,9 +581,11 @@ export function BoardView({
         contexts={state.contexts}
         activeContextId={filters.contextId}
         counts={contextCounts}
+        fact={fact}
         onSelectContext={(contextId) =>
           setFilters((f) => ({ ...f, contextId }))
         }
+        onNewTask={startNewTask}
         onRenameBoard={(name) => {
           dispatch({ type: "board/rename", name });
           persist(
@@ -575,7 +620,19 @@ export function BoardView({
             onDragEnd={onDragEnd}
             onDragCancel={() => setDragging(null)}
           >
-            <div className="scrollbar-none flex min-h-0 flex-1 gap-2 overflow-x-auto p-4">
+            <div
+              ref={boardRef}
+              onScroll={measureSides}
+              style={
+                {
+                  // Short on purpose: enough to take the hard edge off, not
+                  // enough to read as a vignette.
+                  "--fade-left": sideFade.left ? "24px" : "0px",
+                  "--fade-right": sideFade.right ? "24px" : "0px",
+                } as CSSProperties
+              }
+              className="fade-sides scrollbar-none flex min-h-0 flex-1 gap-2 overflow-x-auto p-4"
+            >
               <SortableContext
                 items={state.columnOrder}
                 strategy={horizontalListSortingStrategy}

@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, inArray, max } from "drizzle-orm";
+import { eq, inArray, max, min } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
@@ -16,7 +16,7 @@ import {
   taskLabels,
   tasks,
 } from "@/db/schema";
-import { positionBetween } from "@/lib/utils";
+import { positionBefore, positionBetween } from "@/lib/utils";
 
 /**
  * Single-user app: there is no session to check yet, so these run for whoever
@@ -187,8 +187,10 @@ export async function createTask(input: TaskInput) {
   const title = input.title.trim();
   if (!title) throw new Error("Task needs a title");
 
-  const last = db
-    .select({ value: max(tasks.position) })
+  // New cards land at the top of the column, so the position goes below the
+  // current first rather than above the last.
+  const first = db
+    .select({ value: min(tasks.position) })
     .from(tasks)
     .where(eq(tasks.columnId, input.columnId))
     .get();
@@ -203,7 +205,7 @@ export async function createTask(input: TaskInput) {
         description: input.description?.trim() ?? "",
         priority: input.priority ?? "none",
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
-        position: (last?.value ?? 0) + 1000,
+        position: positionBefore(first?.value),
       })
       .returning()
       .all();

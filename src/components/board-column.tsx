@@ -15,7 +15,13 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button, IconButton, Input, useDismiss } from "@/components/ui";
 import { TaskCard } from "@/components/task-card";
 import type { Priority } from "@/db/schema";
@@ -88,11 +94,13 @@ export function BoardColumn({
   const menuRef = useDismiss(menuOpen, () => setMenuOpen(false));
   const listRef = useRef<HTMLDivElement>(null);
   const [moreBelow, setMoreBelow] = useState(false);
+  const [moreAbove, setMoreAbove] = useState(false);
 
   const measure = useCallback(() => {
     const el = listRef.current;
     if (!el) return;
     setMoreBelow(el.scrollHeight - el.scrollTop - el.clientHeight > 2);
+    setMoreAbove(el.scrollTop > 2);
   }, []);
 
   // Re-measure when the card list changes or the column is resized, not just on
@@ -214,10 +222,13 @@ export function BoardColumn({
       <div
         ref={listRef}
         onScroll={measure}
-        className={cn(
-          "scrollbar-none min-h-0 flex-1 space-y-3.5 overflow-y-auto px-3 pb-3 pt-0.5",
-          moreBelow && "fade-bottom",
-        )}
+        style={
+          {
+            "--fade-top": moreAbove ? "26px" : "0px",
+            "--fade-bottom": moreBelow ? "40px" : "0px",
+          } as CSSProperties
+        }
+        className="fade-edges scrollbar-none min-h-0 flex-1 space-y-3.5 overflow-y-auto px-3 pb-3 pt-0.5"
       >
         <SortableContext
           items={tasks.map((t) => t.id)}

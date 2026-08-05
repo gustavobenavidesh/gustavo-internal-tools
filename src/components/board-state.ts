@@ -78,9 +78,10 @@ export function boardReducer(
         tasks: { ...state.tasks, [action.task.id]: action.task },
         taskOrder: {
           ...state.taskOrder,
+          // Top of the column, matching the position the action assigns.
           [action.task.columnId]: [
-            ...(state.taskOrder[action.task.columnId] ?? []),
             action.task.id,
+            ...(state.taskOrder[action.task.columnId] ?? []),
           ],
         },
       };

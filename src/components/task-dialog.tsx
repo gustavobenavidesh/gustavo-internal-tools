@@ -225,7 +225,7 @@ export function TaskDialog({
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset transition-colors",
                     on
-                      ? "bg-black/5 text-ink ring-black/8"
+                      ? "bg-panel-raised text-ink ring-hairline-strong"
                       : "bg-transparent text-ink-faint ring-hairline hover:text-ink",
                   )}
                 >

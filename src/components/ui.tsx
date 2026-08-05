@@ -22,7 +22,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 const VARIANTS: Record<NonNullable<ButtonProps["variant"]>, string> = {
   primary:
     "bg-accent text-white hover:bg-accent-ink shadow-sm shadow-accent/25 disabled:bg-accent/40",
-  subtle: "bg-panel-raised text-ink hover:bg-canvas ring-1 ring-hairline",
+  subtle: "bg-surface text-ink hover:bg-panel-raised ring-1 ring-hairline",
   ghost: "text-ink-soft hover:text-ink hover:bg-black/5",
   danger: "text-rose-700 hover:text-rose-800 hover:bg-rose-500/10",
 };
@@ -245,6 +245,10 @@ export function AnchoredMenu({
     document.body,
   );
 }
+
+/** Keyboard hints — shared so the search field and the New task button match. */
+export const KBD =
+  "rounded-md bg-black/5 px-1.5 py-1 text-[10px] font-medium leading-none text-ink-faint ring-1 ring-inset ring-black/5";
 
 export const MENU_ITEM =
   "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink transition-colors hover:bg-black/5";

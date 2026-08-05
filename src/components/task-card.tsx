@@ -248,7 +248,7 @@ export function TaskCardBody({
               className={cn(
                 muted
                   ? "bg-transparent text-ink-faint ring-0 outline outline-1 outline-dashed -outline-offset-1 outline-hairline-strong"
-                  : "bg-black/4 text-ink-soft ring-black/6",
+                  : "bg-canvas text-ink-soft ring-hairline",
                 docked && "pr-2.5",
               )}
               style={
@@ -284,7 +284,7 @@ export function TaskCardBody({
                 "-ml-[7px] w-6 justify-center px-0",
                 muted
                   ? "bg-transparent text-ink-ghost ring-0 outline outline-1 outline-dashed -outline-offset-1 outline-hairline-strong"
-                  : "bg-black/4 text-ink-faint ring-black/6 hover:text-ink-soft",
+                  : "bg-canvas text-ink-faint ring-hairline hover:text-ink-soft",
               )}
               style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}
               label=""

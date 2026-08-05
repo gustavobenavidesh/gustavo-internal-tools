@@ -23,6 +23,11 @@ export function positionAtEnd(positions: number[]): number {
   return positions.length ? Math.max(...positions) + STEP : STEP;
 }
 
+/** Ahead of everything else in a column — where new cards go. */
+export function positionBefore(first?: number | null): number {
+  return first == null ? STEP : first - STEP;
+}
+
 /**
  * Ties the last two words together with a non-breaking space so a title can
  * never wrap to a lone word. `text-wrap: pretty` does this natively but only in

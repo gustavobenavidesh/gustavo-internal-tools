@@ -86,6 +86,10 @@
   --font-sans:
     "Die Grotesk", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  /* Charter ships with macOS and was cut for coarse rendering, so it holds up at
+     small sizes better than Georgia. All system faces — nothing to download. */
+  --font-serif: Charter, "Bitstream Charter", "Iowan Old Style", Georgia,
+    "Times New Roman", serif;
 }
 
 :root {
@@ -168,17 +172,48 @@ body {
 }
 
 /**
- * Softens the bottom edge of a column's list so the last card fades out instead
- * of being sliced off. Applied only while there's more to scroll to — otherwise
- * it would eat the "Add task" row sitting at the end of a short list.
+ * Fades a column's list where it runs under the header or past the bottom edge,
+ * instead of slicing cards off. The distances come in as variables so the same
+ * mask covers all four states — at 0px the gradient's stops collapse and it
+ * renders as fully opaque, so there's nothing to toggle in the class list.
  */
-@utility fade-bottom {
+@utility fade-edges {
   -webkit-mask-image: linear-gradient(
     to bottom,
-    #000 calc(100% - 40px),
+    #0000 0,
+    #000 var(--fade-top, 0px),
+    #000 calc(100% - var(--fade-bottom, 0px)),
     #0000 100%
   );
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), #0000 100%);
+  mask-image: linear-gradient(
+    to bottom,
+    #0000 0,
+    #000 var(--fade-top, 0px),
+    #000 calc(100% - var(--fade-bottom, 0px)),
+    #0000 100%
+  );
+}
+
+/**
+ * The horizontal counterpart of `fade-edges`, for the board's own scroller. Same
+ * variable trick: at 0px the stops collapse and the mask is a no-op, so the
+ * edges only soften on the side that has something scrolled past it.
+ */
+@utility fade-sides {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #0000 0,
+    #000 var(--fade-left, 0px),
+    #000 calc(100% - var(--fade-right, 0px)),
+    #0000 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    #0000 0,
+    #000 var(--fade-left, 0px),
+    #000 calc(100% - var(--fade-right, 0px)),
+    #0000 100%
+  );
 }
 
 @utility scrollbar-none {

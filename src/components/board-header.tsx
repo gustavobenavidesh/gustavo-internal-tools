@@ -2,7 +2,7 @@
 
 import { Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { type RefObject, useState } from "react";
-import { Button, IconButton, Input, useDismiss } from "@/components/ui";
+import { Button, IconButton, Input, KBD, useDismiss } from "@/components/ui";
 import { PRIORITIES, type Priority } from "@/db/schema";
 import { PRIORITY_STYLES, labelColor } from "@/lib/colors";
 import type { ClientLabel } from "@/lib/types";
@@ -78,8 +78,13 @@ export function BoardHeader({
             <X className="size-3.5" />
           </IconButton>
         ) : (
-          <kbd className="pointer-events-none absolute right-2.5 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-full bg-black/6 px-2 py-1 text-[10px] font-medium leading-none text-ink-faint ring-1 ring-inset ring-black/5">
-            <span>/</span>
+          <kbd
+            className={cn(
+              KBD,
+              "pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2",
+            )}
+          >
+            /
           </kbd>
         )}
       </div>
