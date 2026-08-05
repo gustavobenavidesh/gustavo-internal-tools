@@ -81,10 +81,10 @@ export function BoardHeader({
           <kbd
             className={cn(
               KBD,
-              "pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2",
+              "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2",
             )}
           >
-            /
+            S
           </kbd>
         )}
       </div>

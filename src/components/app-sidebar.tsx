@@ -156,7 +156,7 @@ export function AppSidebar({
         />
       )}
 
-      <div className="mt-auto space-y-4 pt-6">
+      <div className="mt-auto space-y-[15px] pt-6">
         <button
           type="button"
           onClick={onNewTask}
@@ -355,7 +355,7 @@ function SidebarRow({
   return (
     <div
       className={cn(
-        "group flex items-center rounded-lg pl-0.5 pr-1 transition-colors",
+        "group flex items-center rounded-lg pl-1 pr-1 transition-colors",
         active ? "bg-black/5" : "hover:bg-black/3",
       )}
     >

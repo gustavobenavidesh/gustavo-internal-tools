@@ -31,6 +31,7 @@ import type {
   ClientLabel,
   ClientTask,
 } from "@/lib/types";
+import { TargetRings } from "@/components/target-rings";
 import { columnIcon, columnIconTone } from "@/lib/column-icons";
 import { cn } from "@/lib/utils";
 
@@ -114,7 +115,9 @@ export function BoardColumn({
     return () => observer.disconnect();
   }, [measure, tasks.length]);
 
-  const ColumnIcon = columnIcon(column);
+  // The featured column gets the two-ring mark; everything else takes a Lucide
+  // glyph from the name/flag mapping.
+  const ColumnGlyph = column.isFocus ? TargetRings : columnIcon(column);
   const overLimit = column.wipLimit !== null && totalCount > column.wipLimit;
   const labelsById = new Map(labels.map((l) => [l.id, l]));
 
@@ -143,7 +146,8 @@ export function BoardColumn({
           {...attributes}
           {...listeners}
         >
-          <ColumnIcon
+          <ColumnGlyph
+            strokeWidth={column.isDone ? 2.5 : 2}
             className={cn(
               "size-4",
               // Matches the title: accent on the featured column, otherwise

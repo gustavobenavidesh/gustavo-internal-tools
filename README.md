@@ -33,8 +33,8 @@ npm run dev       # http://localhost:3000
 - Multiple boards via the switcher at the bottom of the sidebar.
 - Archive instead of delete: archived tasks leave the board but stay in the DB.
 
-Shortcuts: `n` new task in the first column, `/` focus search (`⌘K` also
-works in browsers that don't reserve it), `Esc` clear
+Shortcuts: `n` new task, `s` focus search (`⌥N` / `⌘K` also work where the
+browser doesn't reserve them), `Esc` clear
 filters / close, `Enter` save, `Shift+Enter` newline in the composer.
 
 ## Layout

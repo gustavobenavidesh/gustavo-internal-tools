@@ -75,6 +75,10 @@
   /* Shadows are tinted with the ink rather than black; black goes grey here. */
   --color-shade: #232325;
 
+  /* A wash of green for finished cards — its own token so the tint is a surface
+     like the others, rather than an opacity trick over white. */
+  --color-done: #f2faf5;
+
   /* Apple's system blue. `accent` is for fills, rings and focus; `accent-ink`
      is the darker step for accent-coloured *text*, which needs 4.5:1 on white
      that the bright blue can't reach. */

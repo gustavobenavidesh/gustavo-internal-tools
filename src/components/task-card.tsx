@@ -4,7 +4,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { AlignLeft, Check, Plus } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { AnchoredMenu, MENU_ITEM } from "@/components/ui";
 import { PRIORITIES, type Priority } from "@/db/schema";
 import { PRIORITY_STYLES, labelColor } from "@/lib/colors";
@@ -60,9 +60,46 @@ export function TaskCard({
     data: { type: "task", columnId: task.columnId },
   });
 
+  /**
+   * dnd-kit's own layout animation opts out when a container's item list changes
+   * without the item's index changing — which is exactly what happens to the
+   * cards below one that's dragged away, so they snapped into place. This FLIPs
+   * them by hand: remember where the card was laid out, and if the next render
+   * puts it somewhere else, animate from the old position to the new one.
+   *
+   * Offsets, not `getBoundingClientRect`: offsets are layout-relative, so
+   * scrolling the column doesn't look like movement.
+   */
+  const wrapper = useRef<HTMLDivElement | null>(null);
+  const lastBox = useRef<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const el = wrapper.current;
+    if (!el) return;
+
+    const box = { top: el.offsetTop, left: el.offsetLeft };
+    const previous = lastBox.current;
+    lastBox.current = box;
+
+    // The dragged card is already following the pointer; don't fight it.
+    if (!previous || isDragging) return;
+
+    const dx = previous.left - box.left;
+    const dy = previous.top - box.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+
+    el.animate(
+      [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }],
+      { duration: 220, easing: "cubic-bezier(.2,.8,.3,1)" },
+    );
+  });
+
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => {
+        wrapper.current = node;
+        setNodeRef(node);
+      }}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       // While this card is the drag source it stays in the flow as a hole for
       // the overlay to land in.
@@ -179,22 +216,39 @@ export function TaskCardBody({
         // Parked cards read as inactive: flat, dashed and barely filled.
         muted
           ? "bg-transparent ring-0 outline outline-2 outline-dashed -outline-offset-2 outline-hairline"
-          : "bg-panel-raised shadow-sm shadow-shade/10 ring-hairline hover:shadow-shade/15 hover:ring-hairline-strong",
+          : cn(
+              "shadow-sm shadow-shade/10 hover:shadow-shade/15",
+              done
+                ? "bg-done ring-emerald-600/15 hover:ring-emerald-600/25"
+                : "bg-panel-raised ring-hairline hover:ring-hairline-strong",
+            ),
         overlay &&
-          "rotate-1 cursor-grabbing bg-panel-raised shadow-xl shadow-shade/25 ring-accent/50",
+          "rotate-3 scale-[1.03] cursor-grabbing bg-panel-raised shadow-2xl shadow-shade/30 ring-accent/50",
         className,
       )}
       {...props}
     >
-      <p
-        className={cn(
-          "line-clamp-3 pr-4 text-pretty text-[16px] font-medium leading-snug",
-          muted ? "text-ink-soft" : "text-ink",
-          done && "text-ink-faint line-through decoration-ink-ghost",
+      {/* The tick shares the title's row, so a long title wraps against it
+          rather than running underneath. */}
+      <div className="flex items-start gap-2">
+        <p
+          className={cn(
+            "line-clamp-3 min-w-0 flex-1 pr-2 text-pretty text-[16px] font-medium leading-snug",
+            muted ? "text-ink-soft" : "text-ink",
+            done && "text-ink-faint",
+          )}
+        >
+          {noOrphans(task.title)}
+        </p>
+
+        {done && (
+          <Check
+            className="mt-0.5 size-4 shrink-0 text-emerald-600"
+            strokeWidth={2.75}
+            aria-label="Done"
+          />
         )}
-      >
-        {noOrphans(task.title)}
-      </p>
+      </div>
 
       {task.subtasks.length > 0 && (
         <ul className="mt-3 space-y-1">
@@ -248,7 +302,11 @@ export function TaskCardBody({
               className={cn(
                 muted
                   ? "bg-transparent text-ink-faint ring-0 outline outline-1 outline-dashed -outline-offset-1 outline-hairline-strong"
-                  : "bg-canvas text-ink-soft ring-hairline",
+                  : done
+                    ? // White, not the canvas tone: on the green fill of a
+                      // finished card the grey pill all but disappears.
+                      "bg-panel-raised text-ink-soft ring-emerald-600/15"
+                    : "bg-canvas text-ink-soft ring-hairline",
                 docked && "pr-2.5",
               )}
               style={
@@ -284,7 +342,9 @@ export function TaskCardBody({
                 "-ml-[7px] w-6 justify-center px-0",
                 muted
                   ? "bg-transparent text-ink-ghost ring-0 outline outline-1 outline-dashed -outline-offset-1 outline-hairline-strong"
-                  : "bg-canvas text-ink-faint ring-hairline hover:text-ink-soft",
+                  : done
+                    ? "bg-panel-raised text-ink-faint ring-emerald-600/15 hover:text-ink-soft"
+                    : "bg-canvas text-ink-faint ring-hairline hover:text-ink-soft",
               )}
               style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}
               label=""
@@ -347,7 +407,7 @@ export function TaskCardBody({
         ))}
       </div>
 
-      {(due || task.description || done) && (
+      {(due || task.description) && (
         <div className="mt-3 flex items-center gap-2 text-[11px] text-ink-faint">
           {due && (
             <span
@@ -361,12 +421,6 @@ export function TaskCardBody({
           )}
           {task.description && (
             <AlignLeft className="size-3.5" aria-label="Has notes" />
-          )}
-          {done && (
-            <Check
-              className="ml-auto size-3.5 text-lime-700"
-              aria-label="Done"
-            />
           )}
         </div>
       )}

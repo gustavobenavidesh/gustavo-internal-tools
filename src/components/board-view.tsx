@@ -43,6 +43,7 @@ import { boardReducer, initBoardState } from "@/components/board-state";
 import { SidebarResizer } from "@/components/sidebar-resizer";
 import { TaskCardBody } from "@/components/task-card";
 import { TaskDialog, type TaskPatch } from "@/components/task-dialog";
+import { celebrate } from "@/lib/celebrate";
 import type { Priority } from "@/db/schema";
 import type { HistoryFact } from "@/lib/history-fact";
 import type {
@@ -69,6 +70,8 @@ export function BoardView({
   const [dragging, setDragging] = useState<{
     type: "task" | "column";
     id: string;
+    /** Where a task drag began, so a move into a done column can be spotted. */
+    fromColumnId?: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -225,9 +228,11 @@ export function BoardView({
   };
 
   const onDragStart = ({ active }: DragStartEvent) => {
+    const id = String(active.id);
     setDragging({
       type: active.data.current?.type === "column" ? "column" : "task",
-      id: String(active.id),
+      id,
+      fromColumnId: state.tasks[id]?.columnId,
     });
   };
 
@@ -257,6 +262,7 @@ export function BoardView({
   };
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
+    const startedIn = dragging?.fromColumnId;
     setDragging(null);
     if (!over) return;
 
@@ -315,6 +321,16 @@ export function BoardView({
         ),
       "Couldn't save the card's new place",
     );
+
+    // Finishing something is worth marking; shuffling within a done column
+    // isn't, hence the check against where the drag began.
+    if (
+      state.columns[columnId]?.isDone &&
+      startedIn &&
+      !state.columns[startedIn]?.isDone
+    ) {
+      void celebrate();
+    }
   };
 
   // ------------------------------------------------------------- mutations
@@ -427,6 +443,15 @@ export function BoardView({
   };
 
   const moveTaskToColumn = (taskId: string, columnId: string) => {
+    const from = state.tasks[taskId]?.columnId;
+    if (
+      state.columns[columnId]?.isDone &&
+      from &&
+      !state.columns[from]?.isDone
+    ) {
+      void celebrate();
+    }
+
     const toIndex = state.taskOrder[columnId]?.length ?? 0;
     dispatch({ type: "task/move", taskId, toColumnId: columnId, toIndex });
     const prev = state.taskOrder[columnId]?.at(-1) ?? null;
@@ -541,10 +566,10 @@ export function BoardView({
         ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName ?? "");
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
 
-      // `/` is the documented shortcut because some browsers (Arc, and Chrome
-      // with certain extensions) keep ⌘K for their own command bar and never
-      // deliver the keydown to the page. ⌘K above still works where it arrives.
-      if (e.key === "/") {
+      // A plain letter, like `n`: ⌘K is unreliable because some browsers (Arc,
+      // and Chrome with certain extensions) keep it for their own command bar
+      // and never deliver the keydown. ⌘K above still works where it arrives.
+      if (e.key === "s") {
         e.preventDefault();
         searchRef.current?.focus();
         searchRef.current?.select();
