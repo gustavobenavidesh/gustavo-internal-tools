@@ -1,12 +1,19 @@
 "use client";
 
 import { format } from "date-fns";
-import { Archive, Plus, Tag, Trash2 } from "lucide-react";
+import { Archive, Check, Plus, Tag, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Button, FieldLabel, Input, Modal, Textarea } from "@/components/ui";
+import {
+  Button,
+  FieldLabel,
+  IconButton,
+  Input,
+  Modal,
+  Textarea,
+} from "@/components/ui";
 import { LABEL_COLOR_KEYS, PRIORITY_STYLES, labelColor } from "@/lib/colors";
 import { contextIcon } from "@/lib/context-icons";
-import { PRIORITY_ICONS } from "@/lib/priority-icons";
+import { PriorityBars } from "@/components/priority-bars";
 import { fromDateInputValue, toDateInputValue } from "@/lib/dates";
 import { PRIORITIES, type Priority } from "@/db/schema";
 import type {
@@ -40,6 +47,12 @@ type Props = {
   onArchive: () => void;
   onDelete: () => void;
   onCreateLabel: (name: string, color: string) => Promise<ClientLabel | null>;
+  onAddSubtask: (title: string) => void;
+  onUpdateSubtask: (
+    subtaskId: string,
+    patch: { title?: string; done?: boolean },
+  ) => void;
+  onDeleteSubtask: (subtaskId: string) => void;
 };
 
 export function TaskDialog({
@@ -53,6 +66,9 @@ export function TaskDialog({
   onArchive,
   onDelete,
   onCreateLabel,
+  onAddSubtask,
+  onUpdateSubtask,
+  onDeleteSubtask,
 }: Props) {
   const [draft, setDraft] = useState<TaskPatch>({
     title: task.title,
@@ -165,7 +181,6 @@ export function TaskDialog({
           <FieldLabel>Priority</FieldLabel>
           <div className="flex gap-1 rounded-lg bg-panel p-1 ring-1 ring-hairline">
             {PRIORITIES.map((priority) => {
-              const Icon = PRIORITY_ICONS[priority];
               return (
                 <button
                   key={priority}
@@ -181,7 +196,7 @@ export function TaskDialog({
                       : "text-ink-faint hover:bg-black/5",
                   )}
                 >
-                  <Icon className="size-3.5" />
+                  <PriorityBars level={priority} className="size-3.5" />
                   {PRIORITY_STYLES[priority].label}
                 </button>
               );
@@ -229,6 +244,24 @@ export function TaskDialog({
         </div>
 
         <div>
+          <FieldLabel>
+            Subtasks
+            {task.subtasks.length > 0 && (
+              <span className="ml-1.5 font-mono normal-case tracking-normal text-ink-ghost">
+                {task.subtasks.filter((sub) => sub.done).length}/
+                {task.subtasks.length}
+              </span>
+            )}
+          </FieldLabel>
+          <Subtasks
+            subtasks={task.subtasks}
+            onAdd={onAddSubtask}
+            onUpdate={onUpdateSubtask}
+            onDelete={onDeleteSubtask}
+          />
+        </div>
+
+        <div>
           <FieldLabel>Labels</FieldLabel>
           <LabelPicker
             labels={labels}
@@ -257,6 +290,98 @@ export function TaskDialog({
         </div>
       </div>
     </Modal>
+  );
+}
+
+/**
+ * Checklist editor. Writes through on every keystroke-completing action rather
+ * than into the dialog's draft, because subtasks are their own rows — the Save
+ * button covers the fields on the task itself.
+ */
+function Subtasks({
+  subtasks,
+  onAdd,
+  onUpdate,
+  onDelete,
+}: {
+  subtasks: ClientTask["subtasks"];
+  onAdd: (title: string) => void;
+  onUpdate: (
+    subtaskId: string,
+    patch: { title?: string; done?: boolean },
+  ) => void;
+  onDelete: (subtaskId: string) => void;
+}) {
+  const [draft, setDraft] = useState("");
+
+  const add = () => {
+    const title = draft.trim();
+    if (!title) return;
+    onAdd(title);
+    setDraft("");
+  };
+
+  return (
+    <div className="space-y-1.5">
+      {subtasks.map((sub) => (
+        <div key={sub.id} className="group flex items-center gap-2">
+          <button
+            type="button"
+            aria-label={sub.done ? "Mark as not done" : "Mark as done"}
+            onClick={() => onUpdate(sub.id, { done: !sub.done })}
+            className={cn(
+              "grid size-4 shrink-0 place-items-center rounded-[5px] ring-1 ring-inset transition-colors",
+              sub.done
+                ? "bg-ink-faint/70 ring-transparent"
+                : "ring-hairline-strong hover:ring-ink-ghost",
+            )}
+          >
+            {sub.done && <Check className="size-3 text-white" />}
+          </button>
+
+          <input
+            defaultValue={sub.title}
+            onBlur={(e) => {
+              const title = e.currentTarget.value.trim();
+              if (title && title !== sub.title) onUpdate(sub.id, { title });
+              else e.currentTarget.value = sub.title;
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            className={cn(
+              "min-w-0 flex-1 bg-transparent text-sm outline-none",
+              sub.done ? "text-ink-ghost line-through" : "text-ink",
+            )}
+          />
+
+          <IconButton
+            label="Delete subtask"
+            onClick={() => onDelete(sub.id)}
+            className="size-6 opacity-0 hover:text-rose-700 group-hover:opacity-100"
+          >
+            <Trash2 className="size-3" />
+          </IconButton>
+        </div>
+      ))}
+
+      <div className="flex items-center gap-2">
+        <span className="grid size-4 shrink-0 place-items-center rounded-[5px] ring-1 ring-dashed ring-inset ring-hairline-strong" />
+        <input
+          value={draft}
+          placeholder="Add a subtask"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={add}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-ghost"
+        />
+      </div>
+    </div>
   );
 }
 

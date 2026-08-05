@@ -20,7 +20,7 @@ const CONTEXT_ICONS: Array<[RegExp, LucideIcon]> = [
   [/mobile|ios|android/i, Smartphone],
   [/website|site|landing/i, Globe],
   [/marketing|content|social/i, Megaphone],
-  [/sidequest|side quest|misc/i, Compass],
+  [/sidequest|side task|side quest|misc/i, Compass],
 ];
 
 export function contextIcon(name: string): LucideIcon {

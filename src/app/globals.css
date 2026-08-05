@@ -52,25 +52,28 @@
 }
 
 @theme {
-  /* Warm neutral off-white — barely any chroma, closer to paper grey than
-     beige. Surfaces step lightest-in-the-middle rather than monotonically: the
+  /* Near-neutral white-grey, Linear-like: the red-blue delta is down to ~2
+     points, just enough to keep it off a cold blue cast without reading as
+     cream. Surfaces step lightest-in-the-middle rather than monotonically: the
      canvas holds the sidebar, the board card sits lighter on top of it, columns
-     recede again inside that card, and only the task cards are pure white. */
-  --color-canvas: #f1f0ed;
-  --color-surface: #f9f8f6;
-  --color-panel: #eeedea;
+     recede again inside that card, and only task cards are pure white. */
+  --color-canvas: #f4f4f1;
+  --color-surface: #fcfcfa;
+  --color-panel: #f4f4f2;
   --color-panel-raised: #ffffff;
-  --color-hairline: #e6e4e0;
-  --color-hairline-strong: #d3d1cc;
+  /* Inputs that sit on the canvas rather than on a card: recessed below it, so
+     they read as a well to type into rather than a raised panel. */
+  --color-field: #eaeae6;
+  --color-hairline: #eaeae7;
+  --color-hairline-strong: #d8d8d4;
 
-  /* Near-neutral greys with a trace of warmth, so nothing looks blue-shifted. */
-  --color-ink: #1e1d1b;
-  --color-ink-soft: #605e5a;
-  --color-ink-faint: #7a7771;
-  --color-ink-ghost: #adaaa4;
+  --color-ink: #232325;
+  --color-ink-soft: #5f5f5e;
+  --color-ink-faint: #7c7c7a;
+  --color-ink-ghost: #adadab;
 
   /* Shadows are tinted with the ink rather than black; black goes grey here. */
-  --color-shade: #1e1d1b;
+  --color-shade: #232325;
 
   /* Apple's system blue. `accent` is for fills, rings and focus; `accent-ink`
      is the darker step for accent-coloured *text*, which needs 4.5:1 on white
@@ -162,6 +165,20 @@ body {
   input[type="date"]::-webkit-calendar-picker-indicator:hover {
     opacity: 0.8;
   }
+}
+
+/**
+ * Softens the bottom edge of a column's list so the last card fades out instead
+ * of being sliced off. Applied only while there's more to scroll to — otherwise
+ * it would eat the "Add task" row sitting at the end of a short list.
+ */
+@utility fade-bottom {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - 40px),
+    #0000 100%
+  );
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), #0000 100%);
 }
 
 @utility scrollbar-none {

@@ -11,6 +11,8 @@ import {
   columns,
   contexts,
   labels,
+  type Subtask,
+  subtasks,
   taskContexts,
   taskLabels,
   tasks,
@@ -19,6 +21,7 @@ import {
 export type TaskWithLabels = Task & {
   labelIds: string[];
   contextIds: string[];
+  subtasks: Subtask[];
 };
 
 export type BoardData = {
@@ -44,7 +47,7 @@ export const DEFAULT_CONTEXTS = [
   { name: "Mobile App", color: "teal" },
   { name: "Website", color: "olive" },
   { name: "Marketing Content", color: "amber" },
-  { name: "Sidequests", color: "clay" },
+  { name: "Side Tasks", color: "clay" },
 ];
 
 export function contextValues(boardId: string) {
@@ -156,6 +159,21 @@ export function getBoardData(boardId: string): BoardData | null {
     labelsByTask.set(link.taskId, list);
   }
 
+  const boardSubtasks = db
+    .select()
+    .from(subtasks)
+    .innerJoin(tasks, eq(tasks.id, subtasks.taskId))
+    .where(eq(tasks.boardId, boardId))
+    .orderBy(asc(subtasks.position))
+    .all();
+
+  const subtasksByTask = new Map<string, Subtask[]>();
+  for (const { subtasks: row } of boardSubtasks) {
+    const list = subtasksByTask.get(row.taskId) ?? [];
+    list.push(row);
+    subtasksByTask.set(row.taskId, list);
+  }
+
   const contextsByTask = new Map<string, string[]>();
   for (const { task_contexts: link } of contextLinks) {
     const list = contextsByTask.get(link.taskId) ?? [];
@@ -170,6 +188,7 @@ export function getBoardData(boardId: string): BoardData | null {
       ...task,
       labelIds: labelsByTask.get(task.id) ?? [],
       contextIds: contextsByTask.get(task.id) ?? [],
+      subtasks: subtasksByTask.get(task.id) ?? [],
     })),
     labels: boardLabels,
     contexts: boardContexts,

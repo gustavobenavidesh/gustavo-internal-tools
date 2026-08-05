@@ -1,5 +1,12 @@
 import type { BoardData, TaskWithLabels } from "@/db/queries";
-import type { Board, Column, Context, Label, Priority } from "@/db/schema";
+import type {
+  Board,
+  Column,
+  Context,
+  Label,
+  Priority,
+  Subtask,
+} from "@/db/schema";
 
 /**
  * Client-side mirrors of the DB rows with timestamps as epoch millis. Dates do
@@ -17,6 +24,7 @@ export type ClientTask = {
   completedAt: number | null;
   createdAt: number;
   labelIds: string[];
+  subtasks: ClientSubtask[];
 };
 
 export type ClientColumn = {
@@ -25,11 +33,14 @@ export type ClientColumn = {
   wipLimit: number | null;
   isDone: boolean;
   isMuted: boolean;
+  isFocus: boolean;
 };
 
 export type ClientLabel = Pick<Label, "id" | "name" | "color">;
 
 export type ClientContext = Pick<Context, "id" | "name" | "color">;
+
+export type ClientSubtask = Pick<Subtask, "id" | "title" | "done">;
 
 export type ClientBoard = Pick<Board, "id" | "name">;
 
@@ -53,6 +64,11 @@ export function toClientTask(task: TaskWithLabels): ClientTask {
     completedAt: task.completedAt?.getTime() ?? null,
     createdAt: task.createdAt.getTime(),
     labelIds: task.labelIds,
+    subtasks: task.subtasks.map((sub) => ({
+      id: sub.id,
+      title: sub.title,
+      done: sub.done,
+    })),
   };
 }
 
@@ -63,6 +79,7 @@ export function toClientColumn(column: Column): ClientColumn {
     wipLimit: column.wipLimit,
     isDone: column.isDone,
     isMuted: column.isMuted,
+    isFocus: column.isFocus,
   };
 }
 

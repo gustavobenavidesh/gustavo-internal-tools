@@ -22,3 +22,12 @@ export function positionBetween(before?: number, after?: number): number {
 export function positionAtEnd(positions: number[]): number {
   return positions.length ? Math.max(...positions) + STEP : STEP;
 }
+
+/**
+ * Ties the last two words together with a non-breaking space so a title can
+ * never wrap to a lone word. `text-wrap: pretty` does this natively but only in
+ * recent browsers, and only as a preference — this is deterministic.
+ */
+export function noOrphans(text: string) {
+  return text.replace(/\s+(\S+)\s*$/, "\u00A0$1");
+}

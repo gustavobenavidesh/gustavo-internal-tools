@@ -9,13 +9,13 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   Archive,
   Check,
-  GripVertical,
   Moon,
   MoreHorizontal,
   Plus,
+  Star,
   Trash2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, IconButton, Input, useDismiss } from "@/components/ui";
 import { TaskCard } from "@/components/task-card";
 import type { Priority } from "@/db/schema";
@@ -25,6 +25,7 @@ import type {
   ClientLabel,
   ClientTask,
 } from "@/lib/types";
+import { columnIcon, columnIconTone } from "@/lib/column-icons";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -40,12 +41,14 @@ type Props = {
   onOpenTask: (taskId: string) => void;
   onSetTaskContexts: (taskId: string, contextIds: string[]) => void;
   onSetTaskPriority: (taskId: string, priority: Priority) => void;
+  onToggleSubtask: (taskId: string, subtaskId: string, done: boolean) => void;
   onQuickAdd: (columnId: string, title: string) => void;
   onRename: (columnId: string, name: string) => void;
   onDelete: (columnId: string) => void;
   onSetWipLimit: (columnId: string, limit: number | null) => void;
   onToggleDone: (columnId: string, isDone: boolean) => void;
   onToggleMuted: (columnId: string, isMuted: boolean) => void;
+  onToggleFocus: (columnId: string, isFocus: boolean) => void;
   onArchiveAll: (columnId: string) => void;
 };
 
@@ -60,12 +63,14 @@ export function BoardColumn({
   onOpenTask,
   onSetTaskContexts,
   onSetTaskPriority,
+  onToggleSubtask,
   onQuickAdd,
   onRename,
   onDelete,
   onSetWipLimit,
   onToggleDone,
   onToggleMuted,
+  onToggleFocus,
   onArchiveAll,
 }: Props) {
   const {
@@ -81,7 +86,27 @@ export function BoardColumn({
   const [renaming, setRenaming] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useDismiss(menuOpen, () => setMenuOpen(false));
+  const listRef = useRef<HTMLDivElement>(null);
+  const [moreBelow, setMoreBelow] = useState(false);
 
+  const measure = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    setMoreBelow(el.scrollHeight - el.scrollTop - el.clientHeight > 2);
+  }, []);
+
+  // Re-measure when the card list changes or the column is resized, not just on
+  // scroll — adding a card can make a column overflow without any scrolling.
+  useEffect(() => {
+    measure();
+    const el = listRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measure, tasks.length]);
+
+  const ColumnIcon = columnIcon(column);
   const overLimit = column.wipLimit !== null && totalCount > column.wipLimit;
   const labelsById = new Map(labels.map((l) => [l.id, l]));
 
@@ -90,20 +115,36 @@ export function BoardColumn({
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
-        "flex h-full w-[312px] shrink-0 flex-col rounded-2xl bg-panel ring-1 ring-hairline",
+        "flex h-full w-[312px] shrink-0 flex-col rounded-2xl",
+        // Only the featured column is a surface at all — the rest float
+        // directly on the board with no fill and no ring, so emphasis comes
+        // from what's absent everywhere else.
+        column.isFocus ? "bg-canvas ring-1 ring-hairline" : "bg-transparent",
         isDragging && "opacity-40",
       )}
     >
-      <header className="flex items-center gap-1.5 px-3 pb-2.5 pt-3">
+      <header className="flex items-center gap-1 px-3 pb-2.5 pt-3">
+        {/* The status glyph is also the drag handle — a grip alongside it was
+            just noise. */}
         <button
           ref={setActivatorNodeRef}
           type="button"
           aria-label={`Reorder ${column.name}`}
-          className="cursor-grab text-ink-ghost transition-colors hover:text-ink-soft active:cursor-grabbing"
+          title={`Drag to reorder ${column.name}`}
+          className="grid size-5 shrink-0 cursor-grab place-items-center active:cursor-grabbing"
           {...attributes}
           {...listeners}
         >
-          <GripVertical className="size-4" />
+          <ColumnIcon
+            className={cn(
+              "size-4",
+              // Matches the title: accent on the featured column, otherwise
+              // the same tone as every other column icon.
+              column.isFocus
+                ? "text-accent"
+                : (columnIconTone(column) ?? "text-ink-faint"),
+            )}
+          />
         </button>
 
         {renaming ? (
@@ -119,13 +160,15 @@ export function BoardColumn({
           <button
             type="button"
             onClick={() => setRenaming(true)}
-            className="min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left text-[13px] font-semibold text-ink hover:bg-black/5"
+            className={cn(
+              "min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-semibold hover:bg-black/5",
+              column.isFocus
+                ? "text-sm text-accent"
+                : "text-[13px] text-ink-soft",
+            )}
             title="Click to rename"
           >
             {column.name}
-            {column.isDone && (
-              <Check className="ml-1.5 inline size-3 text-lime-700" />
-            )}
           </button>
         )}
 
@@ -161,13 +204,21 @@ export function BoardColumn({
               onSetWipLimit={(limit) => onSetWipLimit(column.id, limit)}
               onToggleDone={(isDone) => onToggleDone(column.id, isDone)}
               onToggleMuted={(isMuted) => onToggleMuted(column.id, isMuted)}
+              onToggleFocus={(isFocus) => onToggleFocus(column.id, isFocus)}
               onArchiveAll={() => onArchiveAll(column.id)}
             />
           )}
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 pb-3 pt-0.5">
+      <div
+        ref={listRef}
+        onScroll={measure}
+        className={cn(
+          "scrollbar-none min-h-0 flex-1 space-y-3.5 overflow-y-auto px-3 pb-3 pt-0.5",
+          moreBelow && "fade-bottom",
+        )}
+      >
         <SortableContext
           items={tasks.map((t) => t.id)}
           strategy={verticalListSortingStrategy}
@@ -184,13 +235,16 @@ export function BoardColumn({
               onOpen={onOpenTask}
               onSetContexts={onSetTaskContexts}
               onSetPriority={onSetTaskPriority}
+              onToggleSubtask={onToggleSubtask}
             />
           ))}
         </SortableContext>
 
-        {tasks.length === 0 && !composing && (
-          <p className="rounded-xl border border-dashed border-hairline-strong px-3 py-7 text-center text-xs text-ink-faint">
-            {totalCount > 0 ? "No matches here" : "Drop tasks here"}
+        {/* Only worth saying something when a filter is hiding the contents —
+            an empty column speaks for itself. */}
+        {tasks.length === 0 && totalCount > 0 && !composing && (
+          <p className="px-3 py-6 text-center text-xs text-ink-faint">
+            No matches here
           </p>
         )}
 
@@ -318,6 +372,7 @@ function ColumnMenu({
   onSetWipLimit,
   onToggleDone,
   onToggleMuted,
+  onToggleFocus,
   onArchiveAll,
 }: {
   column: ClientColumn;
@@ -328,6 +383,7 @@ function ColumnMenu({
   onSetWipLimit: (limit: number | null) => void;
   onToggleDone: (isDone: boolean) => void;
   onToggleMuted: (isMuted: boolean) => void;
+  onToggleFocus: (isFocus: boolean) => void;
   onArchiveAll: () => void;
 }) {
   const [limitDraft, setLimitDraft] = useState(
@@ -360,6 +416,18 @@ function ColumnMenu({
       >
         <Check className="size-3.5" />
         {column.isDone ? "Not a done column" : "Mark as done column"}
+      </button>
+
+      <button
+        type="button"
+        className={item}
+        onClick={() => {
+          onToggleFocus(!column.isFocus);
+          onClose();
+        }}
+      >
+        <Star className="size-3.5" />
+        {column.isFocus ? "Stop featuring this column" : "Feature this column"}
       </button>
 
       <button

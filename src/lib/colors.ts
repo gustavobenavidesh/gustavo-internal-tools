@@ -4,41 +4,50 @@ import type { Priority } from "@/db/schema";
  * Class strings are written out in full because Tailwind only ships classes it
  * finds in source — `bg-${color}-500` would compile to nothing.
  *
- * Tuned for the beige canvas: a soft tint fill with dark text, since the pale
- * text used on dark UIs disappears here.
+ * `chip` is a tinted fill with dark text, `dot` a solid swatch, and `text` the
+ * hue on its own — used where a colour has to sit on the page background, like
+ * a selected sidebar icon.
  */
 export const LABEL_COLORS = {
   stone: {
     chip: "bg-stone-500/12 text-stone-700 ring-stone-600/20",
     dot: "bg-stone-500",
+    text: "text-stone-700",
   },
   rose: {
     chip: "bg-rose-500/12 text-rose-800 ring-rose-600/20",
     dot: "bg-rose-500",
+    text: "text-rose-700",
   },
   amber: {
     chip: "bg-amber-500/18 text-amber-800 ring-amber-700/20",
     dot: "bg-amber-500",
+    text: "text-amber-700",
   },
   olive: {
     chip: "bg-lime-600/12 text-lime-800 ring-lime-700/20",
     dot: "bg-lime-600",
+    text: "text-lime-700",
   },
   teal: {
     chip: "bg-teal-600/12 text-teal-800 ring-teal-700/20",
     dot: "bg-teal-600",
+    text: "text-teal-700",
   },
   sky: {
     chip: "bg-sky-600/12 text-sky-800 ring-sky-700/20",
     dot: "bg-sky-600",
+    text: "text-sky-700",
   },
   violet: {
     chip: "bg-violet-500/12 text-violet-800 ring-violet-600/20",
     dot: "bg-violet-500",
+    text: "text-violet-700",
   },
   clay: {
     chip: "bg-orange-700/12 text-orange-900 ring-orange-800/20",
     dot: "bg-orange-700",
+    text: "text-orange-800",
   },
 } as const;
 

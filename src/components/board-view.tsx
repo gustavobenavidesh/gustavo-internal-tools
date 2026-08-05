@@ -39,6 +39,7 @@ import {
   emptyFilters,
 } from "@/components/board-header";
 import { boardReducer, initBoardState } from "@/components/board-state";
+import { SidebarResizer } from "@/components/sidebar-resizer";
 import { TaskCardBody } from "@/components/task-card";
 import { TaskDialog, type TaskPatch } from "@/components/task-dialog";
 import type { Priority } from "@/db/schema";
@@ -310,6 +311,7 @@ export function BoardView({
         type: "task/add",
         task: {
           ...task,
+          subtasks: [],
           dueDate: null,
           completedAt: null,
           createdAt: Date.now(),
@@ -333,6 +335,61 @@ export function BoardView({
     persist(
       () => actions.updateTask(taskId, { priority }),
       "Couldn't change that card's priority",
+    );
+  };
+
+  // Checklists: the client keeps the whole array, so each change replaces it
+  // locally and persists just the one row that moved.
+  const addSubtask = (taskId: string, title: string) => {
+    persist(async () => {
+      const created = await actions.createSubtask(taskId, title);
+      const task = state.tasks[taskId];
+      dispatch({
+        type: "task/patch",
+        taskId,
+        patch: {
+          subtasks: [
+            ...(task?.subtasks ?? []),
+            { id: created.id, title: created.title, done: created.done },
+          ],
+        },
+      });
+    }, "Couldn't add that subtask");
+  };
+
+  const updateSubtask = (
+    taskId: string,
+    subtaskId: string,
+    patch: { title?: string; done?: boolean },
+  ) => {
+    const task = state.tasks[taskId];
+    if (!task) return;
+    dispatch({
+      type: "task/patch",
+      taskId,
+      patch: {
+        subtasks: task.subtasks.map((sub) =>
+          sub.id === subtaskId ? { ...sub, ...patch } : sub,
+        ),
+      },
+    });
+    persist(
+      () => actions.updateSubtask(subtaskId, patch),
+      "Couldn't update that subtask",
+    );
+  };
+
+  const deleteSubtask = (taskId: string, subtaskId: string) => {
+    const task = state.tasks[taskId];
+    if (!task) return;
+    dispatch({
+      type: "task/patch",
+      taskId,
+      patch: { subtasks: task.subtasks.filter((sub) => sub.id !== subtaskId) },
+    });
+    persist(
+      () => actions.deleteSubtask(subtaskId),
+      "Couldn't delete that subtask",
     );
   };
 
@@ -412,6 +469,7 @@ export function BoardView({
           wipLimit: column.wipLimit,
           isDone: column.isDone,
           isMuted: column.isMuted,
+          isFocus: column.isFocus,
         },
       });
     }, "Couldn't add that column");
@@ -495,6 +553,8 @@ export function BoardView({
         onDeleteContext={deleteContext}
       />
 
+      <SidebarResizer />
+
       {/* The toolbar floats on the canvas; the card below holds only the
           columns, so it reads as one board surface rather than a window. */}
       <main className="flex min-w-0 flex-1 flex-col pb-3.5 pr-[var(--board-gutter)] pt-1.5">
@@ -506,7 +566,7 @@ export function BoardView({
           onAddColumn={addColumn}
         />
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] bg-surface shadow-md shadow-shade/6 ring-1 ring-hairline">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] bg-surface shadow-lg shadow-shade/8 ring-1 ring-hairline">
           <DndContext
             sensors={sensors}
             collisionDetection={collisionDetection}
@@ -515,7 +575,7 @@ export function BoardView({
             onDragEnd={onDragEnd}
             onDragCancel={() => setDragging(null)}
           >
-            <div className="scrollbar-none flex min-h-0 flex-1 gap-4 overflow-x-auto p-4">
+            <div className="scrollbar-none flex min-h-0 flex-1 gap-2 overflow-x-auto p-4">
               <SortableContext
                 items={state.columnOrder}
                 strategy={horizontalListSortingStrategy}
@@ -540,6 +600,9 @@ export function BoardView({
                       onOpenTask={setOpenTaskId}
                       onSetTaskContexts={setTaskContexts}
                       onSetTaskPriority={setTaskPriority}
+                      onToggleSubtask={(taskId, subtaskId, done) =>
+                        updateSubtask(taskId, subtaskId, { done })
+                      }
                       onQuickAdd={quickAdd}
                       onRename={(id, name) => {
                         dispatch({
@@ -568,6 +631,27 @@ export function BoardView({
                         persist(
                           () => actions.updateColumn(id, { wipLimit }),
                           "Couldn't save the WIP limit",
+                        );
+                      }}
+                      onToggleFocus={(id, isFocus) => {
+                        // Mirror the server's exclusivity so the change is instant.
+                        for (const other of state.columnOrder) {
+                          if (state.columns[other]?.isFocus && other !== id) {
+                            dispatch({
+                              type: "column/patch",
+                              columnId: other,
+                              patch: { isFocus: false },
+                            });
+                          }
+                        }
+                        dispatch({
+                          type: "column/patch",
+                          columnId: id,
+                          patch: { isFocus },
+                        });
+                        persist(
+                          () => actions.updateColumn(id, { isFocus }),
+                          "Couldn't update the column",
                         );
                       }}
                       onToggleMuted={(id, isMuted) => {
@@ -637,6 +721,11 @@ export function BoardView({
           onSave={(patch) => saveTask(openTask.id, patch)}
           onMoveToColumn={(columnId) => moveTaskToColumn(openTask.id, columnId)}
           onCreateLabel={createLabel}
+          onAddSubtask={(title) => addSubtask(openTask.id, title)}
+          onUpdateSubtask={(subtaskId, patch) =>
+            updateSubtask(openTask.id, subtaskId, patch)
+          }
+          onDeleteSubtask={(subtaskId) => deleteSubtask(openTask.id, subtaskId)}
           onArchive={() => {
             dispatch({ type: "task/remove", taskIds: [openTask.id] });
             setOpenTaskId(null);
@@ -659,7 +748,7 @@ export function BoardView({
       {error && (
         <div
           role="alert"
-          className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 animate-pop-in rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-900 shadow-lg shadow-shade/10 ring-1 ring-rose-600/25"
+          className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 animate-pop-in rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-900 shadow-lg shadow-shade/8 ring-1 ring-rose-600/25"
         >
           {error} — reloading from the database.
         </div>

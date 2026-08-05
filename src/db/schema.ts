@@ -47,6 +47,8 @@ export const columns = sqliteTable(
     isDone: integer("is_done", { mode: "boolean" }).notNull().default(false),
     /** Cards here render dimmed — for parking lots like a backlog. */
     isMuted: integer("is_muted", { mode: "boolean" }).notNull().default(false),
+    /** The column that matters most: raised, wider. At most one per board. */
+    isFocus: integer("is_focus", { mode: "boolean" }).notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [index("columns_board_idx").on(t.boardId)],
@@ -102,6 +104,22 @@ export const tasks = sqliteTable(
     index("tasks_column_idx").on(t.columnId),
     index("tasks_board_idx").on(t.boardId),
   ],
+);
+
+/** Optional checklist on a card; cards have none until one is added. */
+export const subtasks = sqliteTable(
+  "subtasks",
+  {
+    id: id(),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    done: integer("done", { mode: "boolean" }).notNull().default(false),
+    position: real("position").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("subtasks_task_idx").on(t.taskId)],
 );
 
 export const labels = sqliteTable(
@@ -179,6 +197,11 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
   column: one(columns, { fields: [tasks.columnId], references: [columns.id] }),
   taskContexts: many(taskContexts),
   taskLabels: many(taskLabels),
+  subtasks: many(subtasks),
+}));
+
+export const subtasksRelations = relations(subtasks, ({ one }) => ({
+  task: one(tasks, { fields: [subtasks.taskId], references: [tasks.id] }),
 }));
 
 export const labelsRelations = relations(labels, ({ one, many }) => ({
@@ -196,3 +219,4 @@ export type Column = typeof columns.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type Label = typeof labels.$inferSelect;
 export type Context = typeof contexts.$inferSelect;
+export type Subtask = typeof subtasks.$inferSelect;

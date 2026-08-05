@@ -11,6 +11,7 @@ import {
   columns,
   contexts,
   labels,
+  subtasks,
   taskContexts,
   taskLabels,
   tasks,
@@ -107,6 +108,7 @@ export async function updateColumn(
     wipLimit?: number | null;
     isDone?: boolean;
     isMuted?: boolean;
+    isFocus?: boolean;
   },
 ) {
   const next: Record<string, unknown> = {};
@@ -118,9 +120,28 @@ export async function updateColumn(
   if (patch.wipLimit !== undefined) next.wipLimit = patch.wipLimit;
   if (patch.isDone !== undefined) next.isDone = patch.isDone;
   if (patch.isMuted !== undefined) next.isMuted = patch.isMuted;
+  if (patch.isFocus !== undefined) next.isFocus = patch.isFocus;
   if (Object.keys(next).length === 0) return;
 
-  db.update(columns).set(next).where(eq(columns.id, columnId)).run();
+  db.transaction((tx) => {
+    // "Most important" only means something if it's singular, so focusing a
+    // column clears the flag from the rest of its board.
+    if (patch.isFocus) {
+      const boardId = tx
+        .select({ boardId: columns.boardId })
+        .from(columns)
+        .where(eq(columns.id, columnId))
+        .get()?.boardId;
+      if (boardId) {
+        tx.update(columns)
+          .set({ isFocus: false })
+          .where(eq(columns.boardId, boardId))
+          .run();
+      }
+    }
+
+    tx.update(columns).set(next).where(eq(columns.id, columnId)).run();
+  });
 }
 
 /** Deletes the column and every task in it (FK cascade). */
@@ -326,6 +347,46 @@ export async function archiveColumnTasks(columnId: string) {
     .returning({ id: tasks.id })
     .all();
   return archived.map((t) => t.id);
+}
+
+// ---------------------------------------------------------------- subtasks
+
+export async function createSubtask(taskId: string, title: string) {
+  const trimmed = title.trim();
+  if (!trimmed) throw new Error("Subtask needs a title");
+
+  const last = db
+    .select({ value: max(subtasks.position) })
+    .from(subtasks)
+    .where(eq(subtasks.taskId, taskId))
+    .get();
+
+  const [subtask] = db
+    .insert(subtasks)
+    .values({ taskId, title: trimmed, position: (last?.value ?? 0) + 1000 })
+    .returning()
+    .all();
+  return subtask;
+}
+
+export async function updateSubtask(
+  subtaskId: string,
+  patch: { title?: string; done?: boolean },
+) {
+  const next: Record<string, unknown> = {};
+  if (patch.title !== undefined) {
+    const trimmed = patch.title.trim();
+    if (!trimmed) throw new Error("Subtask needs a title");
+    next.title = trimmed;
+  }
+  if (patch.done !== undefined) next.done = patch.done;
+  if (Object.keys(next).length === 0) return;
+
+  db.update(subtasks).set(next).where(eq(subtasks.id, subtaskId)).run();
+}
+
+export async function deleteSubtask(subtaskId: string) {
+  db.delete(subtasks).where(eq(subtasks.id, subtaskId)).run();
 }
 
 // ---------------------------------------------------------------- contexts

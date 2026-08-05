@@ -1,10 +1,9 @@
 "use client";
 
 import {
-  ChevronsUpDown,
+  ChevronDown,
   Folder,
-  Inbox,
-  KanbanSquare,
+  Layers,
   type LucideIcon,
   Pencil,
   Plus,
@@ -13,6 +12,7 @@ import {
 import Link from "next/link";
 import { startTransition, useState } from "react";
 import * as actions from "@/app/actions";
+import { JuniorMark } from "@/components/junior-mark";
 import { IconButton, Input, useDismiss } from "@/components/ui";
 import { LABEL_COLOR_KEYS, labelColor } from "@/lib/colors";
 import { contextIcon } from "@/lib/context-icons";
@@ -75,9 +75,7 @@ export function AppSidebar({
       />
 
       <div className="mt-5 flex items-center justify-between pb-2.5 pl-2 pr-1">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-ink-faint">
-          Contexts
-        </span>
+        <span className="text-[11px] font-medium text-ink-faint">Contexts</span>
         <IconButton
           label="Add context"
           onClick={() => setCreating(true)}
@@ -88,7 +86,7 @@ export function AppSidebar({
       </div>
 
       <SidebarRow
-        icon={Inbox}
+        icon={Layers}
         label="All Tasks"
         count={counts.all}
         active={activeContextId === null}
@@ -194,7 +192,7 @@ function SidebarRow({
     <div
       className={cn(
         "group flex items-center rounded-lg pl-0.5 pr-1 transition-colors",
-        active ? "bg-black/8" : "hover:bg-black/4",
+        active ? "bg-black/5" : "hover:bg-black/3",
       )}
     >
       {color ? (
@@ -218,7 +216,14 @@ function SidebarRow({
 
       <span className="ml-1 grid size-5 shrink-0 place-items-center">
         <Icon
-          className={cn("size-4", active ? "text-accent" : "text-ink-faint")}
+          className={cn(
+            "size-4",
+            !active
+              ? "text-ink-faint"
+              : color
+                ? labelColor(color).text
+                : "text-ink",
+          )}
         />
       </span>
 
@@ -324,11 +329,13 @@ function BoardMenu({
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-2 rounded-lg py-1.5 pl-1.5 pr-1 text-left transition-colors hover:bg-black/4"
       >
-        <KanbanSquare className="size-4 shrink-0 text-accent" />
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+        <JuniorMark className="-mt-px size-4 shrink-0 text-ink" />
+        {/* Not `flex-1`: the chevron should sit next to the name, not be pushed
+            out to the far edge of the sidebar. */}
+        <span className="min-w-0 truncate text-sm font-semibold text-ink">
           {boardName}
         </span>
-        <ChevronsUpDown className="size-3.5 shrink-0 text-ink-ghost" />
+        <ChevronDown className="size-3.5 shrink-0 text-ink-faint" />
       </button>
 
       {open && (
