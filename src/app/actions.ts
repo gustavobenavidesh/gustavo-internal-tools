@@ -4,11 +4,14 @@ import { eq, inArray, max } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
+import { contextValues } from "@/db/queries";
 import {
   type Priority,
   boards,
   columns,
+  contexts,
   labels,
+  taskContexts,
   taskLabels,
   tasks,
 } from "@/db/schema";
@@ -27,8 +30,10 @@ export async function createBoard(name: string) {
   if (!trimmed) throw new Error("Board name is required");
 
   const nextPosition =
-    (db.select({ value: max(boards.position) }).from(boards).get()?.value ??
-      0) + 1000;
+    (db
+      .select({ value: max(boards.position) })
+      .from(boards)
+      .get()?.value ?? 0) + 1000;
 
   const board = db.transaction((tx) => {
     const [created] = tx
@@ -47,6 +52,8 @@ export async function createBoard(name: string) {
         })),
       )
       .run();
+
+    tx.insert(contexts).values(contextValues(created.id)).run();
 
     return created;
   });
@@ -95,7 +102,12 @@ export async function createColumn(boardId: string, name: string) {
 
 export async function updateColumn(
   columnId: string,
-  patch: { name?: string; wipLimit?: number | null; isDone?: boolean },
+  patch: {
+    name?: string;
+    wipLimit?: number | null;
+    isDone?: boolean;
+    isMuted?: boolean;
+  },
 ) {
   const next: Record<string, unknown> = {};
   if (patch.name !== undefined) {
@@ -105,6 +117,7 @@ export async function updateColumn(
   }
   if (patch.wipLimit !== undefined) next.wipLimit = patch.wipLimit;
   if (patch.isDone !== undefined) next.isDone = patch.isDone;
+  if (patch.isMuted !== undefined) next.isMuted = patch.isMuted;
   if (Object.keys(next).length === 0) return;
 
   db.update(columns).set(next).where(eq(columns.id, columnId)).run();
@@ -141,6 +154,7 @@ function getColumnPosition(columnId: string) {
 export type TaskInput = {
   boardId: string;
   columnId: string;
+  contextIds?: string[];
   title: string;
   description?: string;
   priority?: Priority;
@@ -179,7 +193,19 @@ export async function createTask(input: TaskInput) {
         .run();
     }
 
-    return { ...task, labelIds: input.labelIds ?? [] };
+    if (input.contextIds?.length) {
+      tx.insert(taskContexts)
+        .values(
+          input.contextIds.map((contextId) => ({ taskId: task.id, contextId })),
+        )
+        .run();
+    }
+
+    return {
+      ...task,
+      labelIds: input.labelIds ?? [],
+      contextIds: input.contextIds ?? [],
+    };
   });
 }
 
@@ -191,6 +217,7 @@ export async function updateTask(
     priority?: Priority;
     dueDate?: number | null;
     labelIds?: string[];
+    contextIds?: string[];
   },
 ) {
   const next: Record<string, unknown> = { updatedAt: new Date() };
@@ -213,6 +240,16 @@ export async function updateTask(
       if (patch.labelIds.length) {
         tx.insert(taskLabels)
           .values(patch.labelIds.map((labelId) => ({ taskId, labelId })))
+          .run();
+      }
+    }
+
+    // Replace rather than merge: the client always sends the full set.
+    if (patch.contextIds) {
+      tx.delete(taskContexts).where(eq(taskContexts.taskId, taskId)).run();
+      if (patch.contextIds.length) {
+        tx.insert(taskContexts)
+          .values(patch.contextIds.map((contextId) => ({ taskId, contextId })))
           .run();
       }
     }
@@ -289,6 +326,56 @@ export async function archiveColumnTasks(columnId: string) {
     .returning({ id: tasks.id })
     .all();
   return archived.map((t) => t.id);
+}
+
+// ---------------------------------------------------------------- contexts
+
+export async function createContext(
+  boardId: string,
+  name: string,
+  color: string,
+) {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Context needs a name");
+
+  const last = db
+    .select({ value: max(contexts.position) })
+    .from(contexts)
+    .where(eq(contexts.boardId, boardId))
+    .get();
+
+  const [context] = db
+    .insert(contexts)
+    .values({
+      boardId,
+      name: trimmed,
+      color,
+      position: (last?.value ?? 0) + 1000,
+    })
+    .returning()
+    .all();
+  return context;
+}
+
+export async function updateContext(
+  contextId: string,
+  patch: { name?: string; color?: string },
+) {
+  const next: Record<string, unknown> = {};
+  if (patch.name !== undefined) {
+    const trimmed = patch.name.trim();
+    if (!trimmed) throw new Error("Context needs a name");
+    next.name = trimmed;
+  }
+  if (patch.color !== undefined) next.color = patch.color;
+  if (Object.keys(next).length === 0) return;
+
+  db.update(contexts).set(next).where(eq(contexts.id, contextId)).run();
+}
+
+/** Cards keep existing; their `contextId` is nulled by the FK. */
+export async function deleteContext(contextId: string) {
+  db.delete(contexts).where(eq(contexts.id, contextId)).run();
 }
 
 // ---------------------------------------------------------------- labels

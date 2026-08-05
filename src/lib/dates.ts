@@ -7,11 +7,13 @@ import { differenceInCalendarDays, format } from "date-fns";
 export function formatDue(timestamp: number) {
   const days = differenceInCalendarDays(new Date(timestamp), new Date());
 
-  if (days < -1) return { text: `${Math.abs(days)}d overdue`, tone: "overdue" as const };
+  if (days < -1)
+    return { text: `${Math.abs(days)}d overdue`, tone: "overdue" as const };
   if (days === -1) return { text: "Yesterday", tone: "overdue" as const };
   if (days === 0) return { text: "Today", tone: "today" as const };
   if (days === 1) return { text: "Tomorrow", tone: "soon" as const };
-  if (days < 7) return { text: format(timestamp, "EEE"), tone: "soon" as const };
+  if (days < 7)
+    return { text: format(timestamp, "EEE"), tone: "soon" as const };
   return { text: format(timestamp, "MMM d"), tone: "later" as const };
 }
 

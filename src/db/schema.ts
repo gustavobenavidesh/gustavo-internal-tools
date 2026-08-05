@@ -45,12 +45,35 @@ export const columns = sqliteTable(
     wipLimit: integer("wip_limit"),
     /** Tasks dropped here are treated as finished. */
     isDone: integer("is_done", { mode: "boolean" }).notNull().default(false),
+    /** Cards here render dimmed — for parking lots like a backlog. */
+    isMuted: integer("is_muted", { mode: "boolean" }).notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [index("columns_board_idx").on(t.boardId)],
 );
 
-export const PRIORITIES = ["none", "low", "medium", "high", "urgent"] as const;
+/**
+ * What a card is about — the product area it belongs to (Web App, Website,
+ * Sidequests…). Rows rather than an enum so the list can be edited without a
+ * migration; the sidebar lists these and filters the board by them.
+ */
+export const contexts = sqliteTable(
+  "contexts",
+  {
+    id: id(),
+    boardId: text("board_id")
+      .notNull()
+      .references(() => boards.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** Key into the palette in `src/lib/colors.ts`, not a raw hex value. */
+    color: text("color").notNull().default("stone"),
+    position: real("position").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("contexts_board_idx").on(t.boardId)],
+);
+
+export const PRIORITIES = ["none", "low", "medium", "high"] as const;
 export type Priority = (typeof PRIORITIES)[number];
 
 export const tasks = sqliteTable(
@@ -96,6 +119,23 @@ export const labels = sqliteTable(
   (t) => [index("labels_board_idx").on(t.boardId)],
 );
 
+/** A card can belong to several contexts, so the link is its own table. */
+export const taskContexts = sqliteTable(
+  "task_contexts",
+  {
+    taskId: text("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    contextId: text("context_id")
+      .notNull()
+      .references(() => contexts.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.taskId, t.contextId] }),
+    index("task_contexts_context_idx").on(t.contextId),
+  ],
+);
+
 export const taskLabels = sqliteTable(
   "task_labels",
   {
@@ -113,6 +153,20 @@ export const boardsRelations = relations(boards, ({ many }) => ({
   columns: many(columns),
   tasks: many(tasks),
   labels: many(labels),
+  contexts: many(contexts),
+}));
+
+export const contextsRelations = relations(contexts, ({ one, many }) => ({
+  board: one(boards, { fields: [contexts.boardId], references: [boards.id] }),
+  taskContexts: many(taskContexts),
+}));
+
+export const taskContextsRelations = relations(taskContexts, ({ one }) => ({
+  task: one(tasks, { fields: [taskContexts.taskId], references: [tasks.id] }),
+  context: one(contexts, {
+    fields: [taskContexts.contextId],
+    references: [contexts.id],
+  }),
 }));
 
 export const columnsRelations = relations(columns, ({ one, many }) => ({
@@ -123,6 +177,7 @@ export const columnsRelations = relations(columns, ({ one, many }) => ({
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
   board: one(boards, { fields: [tasks.boardId], references: [boards.id] }),
   column: one(columns, { fields: [tasks.columnId], references: [columns.id] }),
+  taskContexts: many(taskContexts),
   taskLabels: many(taskLabels),
 }));
 
@@ -140,3 +195,4 @@ export type Board = typeof boards.$inferSelect;
 export type Column = typeof columns.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type Label = typeof labels.$inferSelect;
+export type Context = typeof contexts.$inferSelect;

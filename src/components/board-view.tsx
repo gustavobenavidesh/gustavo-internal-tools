@@ -20,7 +20,6 @@ import {
   horizontalListSortingStrategy,
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   startTransition,
@@ -32,12 +31,23 @@ import {
   useState,
 } from "react";
 import * as actions from "@/app/actions";
+import { AppSidebar } from "@/components/app-sidebar";
 import { BoardColumn } from "@/components/board-column";
-import { BoardHeader, type Filters, emptyFilters } from "@/components/board-header";
+import {
+  BoardHeader,
+  type Filters,
+  emptyFilters,
+} from "@/components/board-header";
 import { boardReducer, initBoardState } from "@/components/board-state";
 import { TaskCardBody } from "@/components/task-card";
 import { TaskDialog, type TaskPatch } from "@/components/task-dialog";
-import type { ClientBoard, ClientBoardData, ClientLabel, ClientTask } from "@/lib/types";
+import type { Priority } from "@/db/schema";
+import type {
+  ClientBoard,
+  ClientBoardData,
+  ClientLabel,
+  ClientTask,
+} from "@/lib/types";
 
 export function BoardView({
   data,
@@ -51,7 +61,10 @@ export function BoardView({
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [composeColumnId, setComposeColumnId] = useState<string | null>(null);
-  const [dragging, setDragging] = useState<{ type: "task" | "column"; id: string } | null>(null);
+  const [dragging, setDragging] = useState<{
+    type: "task" | "column";
+    id: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -89,8 +102,19 @@ export function BoardView({
   const visibleTaskIds = useMemo(() => {
     const query = filters.query.trim().toLowerCase();
     const matches = (task: ClientTask) => {
+      if (filters.contextId === "none" && task.contextIds.length > 0)
+        return false;
+      if (
+        filters.contextId !== null &&
+        filters.contextId !== "none" &&
+        !task.contextIds.includes(filters.contextId)
+      )
+        return false;
       if (filters.hideDone && task.completedAt !== null) return false;
-      if (filters.priorities.length && !filters.priorities.includes(task.priority))
+      if (
+        filters.priorities.length &&
+        !filters.priorities.includes(task.priority)
+      )
         return false;
       if (
         filters.labelIds.length &&
@@ -116,12 +140,37 @@ export function BoardView({
     return byColumn;
   }, [filters, state.columnOrder, state.taskOrder, state.tasks]);
 
+  /**
+   * Sidebar counts deliberately ignore the context filter — a row has to show
+   * how many cards it holds even while a different row is selected.
+   */
+  const contextCounts = useMemo(() => {
+    const counts: Record<string, number> & { all: number; none: number } = {
+      all: 0,
+      none: 0,
+    };
+    for (const task of Object.values(state.tasks)) {
+      counts.all += 1;
+      if (task.contextIds.length === 0) {
+        counts.none += 1;
+        continue;
+      }
+      // A card in two contexts counts under both.
+      for (const contextId of task.contextIds) {
+        counts[contextId] = (counts[contextId] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [state.tasks]);
+
   // ------------------------------------------------------------- drag & drop
 
   const sensors = useSensors(
     // A few pixels of slop so a click to open a card isn't read as a drag.
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   const resolveColumn = (overId: string) =>
@@ -200,7 +249,12 @@ export function BoardView({
 
       const at = order.indexOf(activeId);
       persist(
-        () => actions.moveColumn(activeId, order[at - 1] ?? null, order[at + 1] ?? null),
+        () =>
+          actions.moveColumn(
+            activeId,
+            order[at - 1] ?? null,
+            order[at + 1] ?? null,
+          ),
         "Couldn't save the column order",
       );
       return;
@@ -216,7 +270,12 @@ export function BoardView({
       const toIndex = order.indexOf(overId);
       order = order.filter((id) => id !== activeId);
       order.splice(toIndex, 0, activeId);
-      dispatch({ type: "task/move", taskId: activeId, toColumnId: columnId, toIndex });
+      dispatch({
+        type: "task/move",
+        taskId: activeId,
+        toColumnId: columnId,
+        toIndex,
+      });
     }
 
     const at = order.indexOf(activeId);
@@ -236,7 +295,17 @@ export function BoardView({
 
   const quickAdd = (columnId: string, title: string) => {
     persist(async () => {
-      const task = await actions.createTask({ boardId, columnId, title });
+      // Adding a card while a context is selected files it under that context.
+      const contextIds =
+        filters.contextId && filters.contextId !== "none"
+          ? [filters.contextId]
+          : [];
+      const task = await actions.createTask({
+        boardId,
+        columnId,
+        contextIds,
+        title,
+      });
       dispatch({
         type: "task/add",
         task: {
@@ -250,9 +319,29 @@ export function BoardView({
     }, "Couldn't add that task");
   };
 
+  /** Pill dropdowns on the card write straight through, no dialog involved. */
+  const setTaskContexts = (taskId: string, contextIds: string[]) => {
+    dispatch({ type: "task/patch", taskId, patch: { contextIds } });
+    persist(
+      () => actions.updateTask(taskId, { contextIds }),
+      "Couldn't change that card's contexts",
+    );
+  };
+
+  const setTaskPriority = (taskId: string, priority: Priority) => {
+    dispatch({ type: "task/patch", taskId, patch: { priority } });
+    persist(
+      () => actions.updateTask(taskId, { priority }),
+      "Couldn't change that card's priority",
+    );
+  };
+
   const saveTask = (taskId: string, patch: TaskPatch) => {
     dispatch({ type: "task/patch", taskId, patch });
-    persist(() => actions.updateTask(taskId, patch), "Couldn't save your changes");
+    persist(
+      () => actions.updateTask(taskId, patch),
+      "Couldn't save your changes",
+    );
   };
 
   const moveTaskToColumn = (taskId: string, columnId: string) => {
@@ -280,6 +369,38 @@ export function BoardView({
     }
   };
 
+  const createContext = (name: string, color: string) => {
+    persist(async () => {
+      const context = await actions.createContext(boardId, name, color);
+      dispatch({
+        type: "context/add",
+        context: { id: context.id, name: context.name, color: context.color },
+      });
+    }, "Couldn't add that context");
+  };
+
+  const updateContext = (
+    contextId: string,
+    patch: { name?: string; color?: string },
+  ) => {
+    dispatch({ type: "context/patch", contextId, patch });
+    persist(
+      () => actions.updateContext(contextId, patch),
+      "Couldn't update that context",
+    );
+  };
+
+  const deleteContext = (contextId: string) => {
+    dispatch({ type: "context/remove", contextId });
+    if (filters.contextId === contextId) {
+      setFilters((f) => ({ ...f, contextId: null }));
+    }
+    persist(
+      () => actions.deleteContext(contextId),
+      "Couldn't delete that context",
+    );
+  };
+
   const addColumn = () => {
     persist(async () => {
       const column = await actions.createColumn(boardId, "New column");
@@ -290,6 +411,7 @@ export function BoardView({
           name: column.name,
           wipLimit: column.wipLimit,
           isDone: column.isDone,
+          isMuted: column.isMuted,
         },
       });
     }, "Couldn't add that column");
@@ -299,15 +421,32 @@ export function BoardView({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Checked before the typing guard: ⌘K should reach the search box even
+      // when the focus is already inside a field. `code` is checked too because
+      // `key` can arrive as something else under non-Latin layouts.
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        (e.key.toLowerCase() === "k" || e.code === "KeyK")
+      ) {
+        e.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+        return;
+      }
+
       const target = e.target as HTMLElement | null;
       const typing =
         target?.isContentEditable ||
         ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName ?? "");
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
 
+      // `/` is the documented shortcut because some browsers (Arc, and Chrome
+      // with certain extensions) keep ⌘K for their own command bar and never
+      // deliver the keydown to the page. ⌘K above still works where it arrives.
       if (e.key === "/") {
         e.preventDefault();
         searchRef.current?.focus();
+        searchRef.current?.select();
       }
       if (e.key === "n" && !openTaskId) {
         e.preventDefault();
@@ -315,11 +454,11 @@ export function BoardView({
       }
       if (e.key === "Escape") {
         setComposeColumnId(null);
-        setFilters(emptyFilters);
+        setFilters((f) => ({ ...emptyFilters, contextId: f.contextId }));
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [openTaskId, state.columnOrder]);
 
   useEffect(() => {
@@ -329,120 +468,171 @@ export function BoardView({
   }, [error]);
 
   const openTask = openTaskId ? state.tasks[openTaskId] : null;
-  const draggedTask = dragging?.type === "task" ? state.tasks[dragging.id] : null;
+  const draggedTask =
+    dragging?.type === "task" ? state.tasks[dragging.id] : null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <BoardHeader
+    <div className="flex h-full min-h-0">
+      <AppSidebar
         boards={boards}
         boardId={boardId}
         boardName={state.boardName}
-        labels={state.labels}
-        filters={filters}
-        searchRef={searchRef}
-        taskCount={Object.keys(state.tasks).length}
-        onFiltersChange={setFilters}
-        onRename={(name) => {
+        contexts={state.contexts}
+        activeContextId={filters.contextId}
+        counts={contextCounts}
+        onSelectContext={(contextId) =>
+          setFilters((f) => ({ ...f, contextId }))
+        }
+        onRenameBoard={(name) => {
           dispatch({ type: "board/rename", name });
-          persist(() => actions.renameBoard(boardId, name), "Couldn't rename the board");
+          persist(
+            () => actions.renameBoard(boardId, name),
+            "Couldn't rename the board",
+          );
         }}
-        onAddColumn={addColumn}
+        onCreateContext={createContext}
+        onUpdateContext={updateContext}
+        onDeleteContext={deleteContext}
       />
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={collisionDetection}
-        onDragStart={onDragStart}
-        onDragOver={onDragOver}
-        onDragEnd={onDragEnd}
-        onDragCancel={() => setDragging(null)}
-      >
-        <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-3">
-          <SortableContext
-            items={state.columnOrder}
-            strategy={horizontalListSortingStrategy}
+      {/* The toolbar floats on the canvas; the card below holds only the
+          columns, so it reads as one board surface rather than a window. */}
+      <main className="flex min-w-0 flex-1 flex-col pb-3.5 pr-[var(--board-gutter)] pt-1.5">
+        <BoardHeader
+          labels={state.labels}
+          filters={filters}
+          searchRef={searchRef}
+          onFiltersChange={setFilters}
+          onAddColumn={addColumn}
+        />
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] bg-surface shadow-md shadow-shade/6 ring-1 ring-hairline">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={collisionDetection}
+            onDragStart={onDragStart}
+            onDragOver={onDragOver}
+            onDragEnd={onDragEnd}
+            onDragCancel={() => setDragging(null)}
           >
-            {state.columnOrder.map((columnId) => {
-              const column = state.columns[columnId];
-              if (!column) return null;
-              return (
-                <BoardColumn
-                  key={columnId}
-                  column={column}
-                  labels={state.labels}
-                  tasks={(visibleTaskIds[columnId] ?? []).map((id) => state.tasks[id])}
-                  totalCount={state.taskOrder[columnId]?.length ?? 0}
-                  composing={composeColumnId === columnId}
-                  onComposingChange={(open) =>
-                    setComposeColumnId(open ? columnId : null)
-                  }
-                  onOpenTask={setOpenTaskId}
-                  onQuickAdd={quickAdd}
-                  onRename={(id, name) => {
-                    dispatch({ type: "column/patch", columnId: id, patch: { name } });
-                    persist(
-                      () => actions.updateColumn(id, { name }),
-                      "Couldn't rename the column",
-                    );
-                  }}
-                  onDelete={(id) => {
-                    dispatch({ type: "column/remove", columnId: id });
-                    persist(() => actions.deleteColumn(id), "Couldn't delete the column");
-                  }}
-                  onSetWipLimit={(id, wipLimit) => {
-                    dispatch({ type: "column/patch", columnId: id, patch: { wipLimit } });
-                    persist(
-                      () => actions.updateColumn(id, { wipLimit }),
-                      "Couldn't save the WIP limit",
-                    );
-                  }}
-                  onToggleDone={(id, isDone) => {
-                    dispatch({ type: "column/patch", columnId: id, patch: { isDone } });
-                    persist(
-                      () => actions.updateColumn(id, { isDone }),
-                      "Couldn't update the column",
-                    );
-                  }}
-                  onArchiveAll={(id) => {
-                    const taskIds = state.taskOrder[id] ?? [];
-                    dispatch({ type: "task/remove", taskIds });
-                    persist(
-                      () => actions.archiveColumnTasks(id),
-                      "Couldn't archive those tasks",
-                    );
-                  }}
+            <div className="scrollbar-none flex min-h-0 flex-1 gap-4 overflow-x-auto p-4">
+              <SortableContext
+                items={state.columnOrder}
+                strategy={horizontalListSortingStrategy}
+              >
+                {state.columnOrder.map((columnId) => {
+                  const column = state.columns[columnId];
+                  if (!column) return null;
+                  return (
+                    <BoardColumn
+                      key={columnId}
+                      column={column}
+                      labels={state.labels}
+                      tasks={(visibleTaskIds[columnId] ?? []).map(
+                        (id) => state.tasks[id],
+                      )}
+                      contexts={state.contexts}
+                      totalCount={state.taskOrder[columnId]?.length ?? 0}
+                      composing={composeColumnId === columnId}
+                      onComposingChange={(open) =>
+                        setComposeColumnId(open ? columnId : null)
+                      }
+                      onOpenTask={setOpenTaskId}
+                      onSetTaskContexts={setTaskContexts}
+                      onSetTaskPriority={setTaskPriority}
+                      onQuickAdd={quickAdd}
+                      onRename={(id, name) => {
+                        dispatch({
+                          type: "column/patch",
+                          columnId: id,
+                          patch: { name },
+                        });
+                        persist(
+                          () => actions.updateColumn(id, { name }),
+                          "Couldn't rename the column",
+                        );
+                      }}
+                      onDelete={(id) => {
+                        dispatch({ type: "column/remove", columnId: id });
+                        persist(
+                          () => actions.deleteColumn(id),
+                          "Couldn't delete the column",
+                        );
+                      }}
+                      onSetWipLimit={(id, wipLimit) => {
+                        dispatch({
+                          type: "column/patch",
+                          columnId: id,
+                          patch: { wipLimit },
+                        });
+                        persist(
+                          () => actions.updateColumn(id, { wipLimit }),
+                          "Couldn't save the WIP limit",
+                        );
+                      }}
+                      onToggleMuted={(id, isMuted) => {
+                        dispatch({
+                          type: "column/patch",
+                          columnId: id,
+                          patch: { isMuted },
+                        });
+                        persist(
+                          () => actions.updateColumn(id, { isMuted }),
+                          "Couldn't update the column",
+                        );
+                      }}
+                      onToggleDone={(id, isDone) => {
+                        dispatch({
+                          type: "column/patch",
+                          columnId: id,
+                          patch: { isDone },
+                        });
+                        persist(
+                          () => actions.updateColumn(id, { isDone }),
+                          "Couldn't update the column",
+                        );
+                      }}
+                      onArchiveAll={(id) => {
+                        const taskIds = state.taskOrder[id] ?? [];
+                        dispatch({ type: "task/remove", taskIds });
+                        persist(
+                          () => actions.archiveColumnTasks(id),
+                          "Couldn't archive those tasks",
+                        );
+                      }}
+                    />
+                  );
+                })}
+              </SortableContext>
+            </div>
+
+            <DragOverlay
+              dropAnimation={{
+                duration: 180,
+                easing: "cubic-bezier(.2,.8,.3,1)",
+              }}
+            >
+              {draggedTask ? (
+                <TaskCardBody
+                  overlay
+                  task={draggedTask}
+                  contexts={state.contexts}
+                  labels={draggedTask.labelIds
+                    .map((id) => labelsById.get(id))
+                    .filter((l): l is ClientLabel => Boolean(l))}
                 />
-              );
-            })}
-          </SortableContext>
-
-          <button
-            type="button"
-            onClick={addColumn}
-            className="flex h-10 w-[300px] shrink-0 items-center justify-center gap-1.5 rounded-2xl border border-dashed border-hairline-strong text-xs font-medium text-ink-faint transition-colors hover:border-accent/50 hover:text-ink-soft"
-          >
-            <Plus className="size-3.5" /> Add column
-          </button>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         </div>
-
-        <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(.2,.8,.3,1)" }}>
-          {draggedTask ? (
-            <TaskCardBody
-              overlay
-              task={draggedTask}
-              labels={draggedTask.labelIds
-                .map((id) => labelsById.get(id))
-                .filter((l): l is ClientLabel => Boolean(l))}
-            />
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+      </main>
 
       {openTask && (
         <TaskDialog
           task={openTask}
           columns={state.columnOrder.map((id) => state.columns[id])}
           labels={state.labels}
+          contexts={state.contexts}
           onClose={() => setOpenTaskId(null)}
           onSave={(patch) => saveTask(openTask.id, patch)}
           onMoveToColumn={(columnId) => moveTaskToColumn(openTask.id, columnId)}
@@ -450,12 +640,18 @@ export function BoardView({
           onArchive={() => {
             dispatch({ type: "task/remove", taskIds: [openTask.id] });
             setOpenTaskId(null);
-            persist(() => actions.archiveTask(openTask.id), "Couldn't archive that task");
+            persist(
+              () => actions.archiveTask(openTask.id),
+              "Couldn't archive that task",
+            );
           }}
           onDelete={() => {
             dispatch({ type: "task/remove", taskIds: [openTask.id] });
             setOpenTaskId(null);
-            persist(() => actions.deleteTask(openTask.id), "Couldn't delete that task");
+            persist(
+              () => actions.deleteTask(openTask.id),
+              "Couldn't delete that task",
+            );
           }}
         />
       )}
@@ -463,7 +659,7 @@ export function BoardView({
       {error && (
         <div
           role="alert"
-          className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 animate-pop-in rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-900 shadow-lg shadow-[#3a332a]/10 ring-1 ring-rose-600/25"
+          className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 animate-pop-in rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-900 shadow-lg shadow-shade/10 ring-1 ring-rose-600/25"
         >
           {error} — reloading from the database.
         </div>

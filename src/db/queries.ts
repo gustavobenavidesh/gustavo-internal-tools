@@ -3,23 +3,30 @@ import { db } from "./index";
 import {
   type Board,
   type Column,
+  type Context,
   type Label,
   LOCAL_OWNER_ID,
   type Task,
   boards,
   columns,
+  contexts,
   labels,
+  taskContexts,
   taskLabels,
   tasks,
 } from "./schema";
 
-export type TaskWithLabels = Task & { labelIds: string[] };
+export type TaskWithLabels = Task & {
+  labelIds: string[];
+  contextIds: string[];
+};
 
 export type BoardData = {
   board: Board;
   columns: Column[];
   tasks: TaskWithLabels[];
   labels: Label[];
+  contexts: Context[];
 };
 
 const DEFAULT_COLUMNS = [
@@ -29,6 +36,24 @@ const DEFAULT_COLUMNS = [
   { name: "Blocked", isDone: false },
   { name: "Done", isDone: true },
 ];
+
+/** The product areas a card can be about. Seeded per board, editable after. */
+export const DEFAULT_CONTEXTS = [
+  { name: "Web App", color: "sky" },
+  { name: "Desktop App", color: "violet" },
+  { name: "Mobile App", color: "teal" },
+  { name: "Website", color: "olive" },
+  { name: "Marketing Content", color: "amber" },
+  { name: "Sidequests", color: "clay" },
+];
+
+export function contextValues(boardId: string) {
+  return DEFAULT_CONTEXTS.map((context, i) => ({
+    boardId,
+    ...context,
+    position: (i + 1) * 1000,
+  }));
+}
 
 const DEFAULT_LABELS = [
   { name: "deep work", color: "violet" },
@@ -73,6 +98,8 @@ export function ensureDefaultBoard(): Board {
       .values(DEFAULT_LABELS.map((l) => ({ boardId: board.id, ...l })))
       .run();
 
+    tx.insert(contexts).values(contextValues(board.id)).run();
+
     return board;
   });
 }
@@ -106,10 +133,19 @@ export function getBoardData(boardId: string): BoardData | null {
     .orderBy(asc(labels.createdAt))
     .all();
 
+  const boardContexts = ensureContexts(boardId);
+
   const links = db
     .select()
     .from(taskLabels)
     .innerJoin(tasks, eq(tasks.id, taskLabels.taskId))
+    .where(eq(tasks.boardId, boardId))
+    .all();
+
+  const contextLinks = db
+    .select()
+    .from(taskContexts)
+    .innerJoin(tasks, eq(tasks.id, taskContexts.taskId))
     .where(eq(tasks.boardId, boardId))
     .all();
 
@@ -120,15 +156,40 @@ export function getBoardData(boardId: string): BoardData | null {
     labelsByTask.set(link.taskId, list);
   }
 
+  const contextsByTask = new Map<string, string[]>();
+  for (const { task_contexts: link } of contextLinks) {
+    const list = contextsByTask.get(link.taskId) ?? [];
+    list.push(link.contextId);
+    contextsByTask.set(link.taskId, list);
+  }
+
   return {
     board,
     columns: boardColumns,
     tasks: boardTasks.map((task) => ({
       ...task,
       labelIds: labelsByTask.get(task.id) ?? [],
+      contextIds: contextsByTask.get(task.id) ?? [],
     })),
     labels: boardLabels,
+    contexts: boardContexts,
   };
+}
+
+/**
+ * Boards created before contexts existed have none, so seed them on first read
+ * rather than requiring a manual migration step.
+ */
+function ensureContexts(boardId: string): Context[] {
+  const existing = db
+    .select()
+    .from(contexts)
+    .where(eq(contexts.boardId, boardId))
+    .orderBy(asc(contexts.position))
+    .all();
+  if (existing.length > 0) return existing;
+
+  return db.insert(contexts).values(contextValues(boardId)).returning().all();
 }
 
 /** Archived tasks are hidden from the board but kept so nothing is truly lost. */

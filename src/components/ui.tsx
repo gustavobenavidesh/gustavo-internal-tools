@@ -4,9 +4,12 @@ import { X } from "lucide-react";
 import {
   type ButtonHTMLAttributes,
   type ComponentProps,
+  type CSSProperties,
   type ReactNode,
   useEffect,
+  useLayoutEffect,
   useRef,
+  useState,
 } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
@@ -18,7 +21,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const VARIANTS: Record<NonNullable<ButtonProps["variant"]>, string> = {
   primary:
-    "bg-accent text-[#fdfbf6] hover:bg-accent/90 shadow-sm shadow-accent/20 disabled:bg-accent/40",
+    "bg-accent text-white hover:bg-accent-ink shadow-sm shadow-accent/25 disabled:bg-accent/40",
   subtle: "bg-panel-raised text-ink hover:bg-canvas ring-1 ring-hairline",
   ghost: "text-ink-soft hover:text-ink hover:bg-black/5",
   danger: "text-rose-700 hover:text-rose-800 hover:bg-rose-500/10",
@@ -63,10 +66,7 @@ export function IconButton({
   );
 }
 
-export function Input({
-  className,
-  ...props
-}: ComponentProps<"input">) {
+export function Input({ className, ...props }: ComponentProps<"input">) {
   return (
     <input
       className={cn(
@@ -78,10 +78,7 @@ export function Input({
   );
 }
 
-export function Textarea({
-  className,
-  ...props
-}: ComponentProps<"textarea">) {
+export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   return (
     <textarea
       className={cn(
@@ -143,26 +140,26 @@ export function Modal({
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="fixed inset-0 animate-fade-in cursor-default bg-[#3a332a]/25 backdrop-blur-[2px]"
+        className="fixed inset-0 animate-fade-in cursor-default bg-shade/25 backdrop-blur-[2px]"
       />
       <div
         ref={panel}
         role="dialog"
         aria-modal="true"
         className={cn(
-          "relative w-full animate-pop-in rounded-2xl bg-canvas shadow-2xl shadow-[#3a332a]/20 ring-1 ring-hairline",
+          "relative w-full animate-pop-in rounded-2xl bg-canvas shadow-2xl shadow-shade/20 ring-1 ring-hairline",
           width,
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-hairline px-5 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-5">
           <div className="min-w-0 flex-1">{title}</div>
           <IconButton label="Close" onClick={onClose}>
             <X className="size-4" />
           </IconButton>
         </div>
-        <div className="px-5 py-4">{children}</div>
+        <div className="px-6 py-5">{children}</div>
         {footer ? (
-          <div className="flex items-center justify-between gap-3 border-t border-hairline px-5 py-3">
+          <div className="flex items-center justify-between gap-3 border-t border-hairline px-6 py-4">
             {footer}
           </div>
         ) : null}
@@ -171,6 +168,86 @@ export function Modal({
     document.body,
   );
 }
+
+/**
+ * A menu pinned to an element but rendered in a portal, so the column's
+ * `overflow-y-auto` can't clip it. Because it's `position: fixed`, any scroll
+ * would detach it from its anchor — so scrolling closes it.
+ */
+export function AnchoredMenu({
+  anchor,
+  onClose,
+  children,
+  width = 184,
+}: {
+  anchor: HTMLElement | null;
+  onClose: () => void;
+  children: ReactNode;
+  width?: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<CSSProperties | null>(null);
+
+  useLayoutEffect(() => {
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const left = Math.max(
+      8,
+      Math.min(rect.left, window.innerWidth - width - 8),
+    );
+    const spaceBelow = window.innerHeight - rect.bottom;
+
+    // Flip above the pill when there isn't room for the menu underneath it.
+    setStyle(
+      spaceBelow < 220 && rect.top > spaceBelow
+        ? { bottom: window.innerHeight - rect.top + 6, left, width }
+        : { top: rect.bottom + 6, left, width },
+    );
+  }, [anchor, width]);
+
+  useEffect(() => {
+    const onPointerDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onClose, true);
+    window.addEventListener("resize", onClose);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onClose, true);
+      window.removeEventListener("resize", onClose);
+    };
+  }, [onClose]);
+
+  if (!style || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      ref={ref}
+      style={{ position: "fixed", ...style }}
+      // A portal escapes the DOM tree but NOT the React tree: without stopping
+      // these, a click on a menu item still bubbles to the card that rendered
+      // the trigger, opening the task dialog and starting a drag.
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      className="z-50 max-h-64 animate-pop-in overflow-y-auto rounded-xl bg-panel-raised p-1.5 shadow-xl shadow-shade/20 ring-1 ring-hairline"
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
+export const MENU_ITEM =
+  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink transition-colors hover:bg-black/5";
 
 /** Click-outside + Escape dismissal for header popovers. */
 export function useDismiss(open: boolean, onClose: () => void) {

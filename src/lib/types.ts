@@ -1,5 +1,5 @@
 import type { BoardData, TaskWithLabels } from "@/db/queries";
-import type { Board, Column, Label, Priority } from "@/db/schema";
+import type { Board, Column, Context, Label, Priority } from "@/db/schema";
 
 /**
  * Client-side mirrors of the DB rows with timestamps as epoch millis. Dates do
@@ -9,6 +9,7 @@ import type { Board, Column, Label, Priority } from "@/db/schema";
 export type ClientTask = {
   id: string;
   columnId: string;
+  contextIds: string[];
   title: string;
   description: string;
   priority: Priority;
@@ -23,9 +24,12 @@ export type ClientColumn = {
   name: string;
   wipLimit: number | null;
   isDone: boolean;
+  isMuted: boolean;
 };
 
 export type ClientLabel = Pick<Label, "id" | "name" | "color">;
+
+export type ClientContext = Pick<Context, "id" | "name" | "color">;
 
 export type ClientBoard = Pick<Board, "id" | "name">;
 
@@ -34,12 +38,14 @@ export type ClientBoardData = {
   columns: ClientColumn[];
   tasks: ClientTask[];
   labels: ClientLabel[];
+  contexts: ClientContext[];
 };
 
 export function toClientTask(task: TaskWithLabels): ClientTask {
   return {
     id: task.id,
     columnId: task.columnId,
+    contextIds: task.contextIds,
     title: task.title,
     description: task.description,
     priority: task.priority,
@@ -56,6 +62,7 @@ export function toClientColumn(column: Column): ClientColumn {
     name: column.name,
     wipLimit: column.wipLimit,
     isDone: column.isDone,
+    isMuted: column.isMuted,
   };
 }
 
@@ -64,6 +71,15 @@ export function toClientBoardData(data: BoardData): ClientBoardData {
     board: { id: data.board.id, name: data.board.name },
     columns: data.columns.map(toClientColumn),
     tasks: data.tasks.map(toClientTask),
-    labels: data.labels.map((l) => ({ id: l.id, name: l.name, color: l.color })),
+    labels: data.labels.map((l) => ({
+      id: l.id,
+      name: l.name,
+      color: l.color,
+    })),
+    contexts: data.contexts.map((c) => ({
+      id: c.id,
+      name: c.name,
+      color: c.color,
+    })),
   };
 }

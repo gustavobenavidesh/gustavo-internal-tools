@@ -1,4 +1,10 @@
-import type { ClientBoardData, ClientColumn, ClientLabel, ClientTask } from "@/lib/types";
+import type {
+  ClientBoardData,
+  ClientColumn,
+  ClientContext,
+  ClientLabel,
+  ClientTask,
+} from "@/lib/types";
 
 /**
  * Order is stored as explicit id arrays rather than the numeric positions the
@@ -12,6 +18,7 @@ export type BoardState = {
   taskOrder: Record<string, string[]>;
   tasks: Record<string, ClientTask>;
   labels: ClientLabel[];
+  contexts: ClientContext[];
 };
 
 export type BoardAction =
@@ -25,7 +32,14 @@ export type BoardAction =
   | { type: "column/patch"; columnId: string; patch: Partial<ClientColumn> }
   | { type: "column/remove"; columnId: string }
   | { type: "column/move"; columnId: string; toIndex: number }
-  | { type: "label/add"; label: ClientLabel };
+  | { type: "label/add"; label: ClientLabel }
+  | { type: "context/add"; context: ClientContext }
+  | {
+      type: "context/patch";
+      contextId: string;
+      patch: Partial<ClientContext>;
+    }
+  | { type: "context/remove"; contextId: string };
 
 export function initBoardState(data: ClientBoardData): BoardState {
   const taskOrder: Record<string, string[]> = {};
@@ -39,6 +53,7 @@ export function initBoardState(data: ClientBoardData): BoardState {
     taskOrder,
     tasks: Object.fromEntries(data.tasks.map((t) => [t.id, t])),
     labels: data.labels,
+    contexts: data.contexts,
   };
 }
 
@@ -46,7 +61,10 @@ export function columnOfTask(state: BoardState, taskId: string) {
   return state.tasks[taskId]?.columnId;
 }
 
-export function boardReducer(state: BoardState, action: BoardAction): BoardState {
+export function boardReducer(
+  state: BoardState,
+  action: BoardAction,
+): BoardState {
   switch (action.type) {
     case "reset":
       return initBoardState(action.data);
@@ -96,7 +114,9 @@ export function boardReducer(state: BoardState, action: BoardAction): BoardState
       const source = state.taskOrder[from].filter((id) => id !== action.taskId);
       const target = sameColumn
         ? source
-        : state.taskOrder[action.toColumnId].filter((id) => id !== action.taskId);
+        : state.taskOrder[action.toColumnId].filter(
+            (id) => id !== action.taskId,
+          );
 
       const index = Math.max(0, Math.min(action.toIndex, target.length));
       target.splice(index, 0, action.taskId);
@@ -168,5 +188,39 @@ export function boardReducer(state: BoardState, action: BoardAction): BoardState
 
     case "label/add":
       return { ...state, labels: [...state.labels, action.label] };
+
+    case "context/add":
+      return { ...state, contexts: [...state.contexts, action.context] };
+
+    case "context/patch":
+      return {
+        ...state,
+        contexts: state.contexts.map((c) =>
+          c.id === action.contextId ? { ...c, ...action.patch } : c,
+        ),
+      };
+
+    case "context/remove": {
+      // The FK cascade drops the join rows server-side; mirror that locally so
+      // cards stay on the board instead of vanishing with their context.
+      const tasks = Object.fromEntries(
+        Object.entries(state.tasks).map(([id, task]) => [
+          id,
+          task.contextIds.includes(action.contextId)
+            ? {
+                ...task,
+                contextIds: task.contextIds.filter(
+                  (c) => c !== action.contextId,
+                ),
+              }
+            : task,
+        ]),
+      );
+      return {
+        ...state,
+        tasks,
+        contexts: state.contexts.filter((c) => c.id !== action.contextId),
+      };
+    }
   }
 }

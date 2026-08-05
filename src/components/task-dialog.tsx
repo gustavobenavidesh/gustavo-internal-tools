@@ -3,18 +3,22 @@
 import { format } from "date-fns";
 import { Archive, Plus, Tag, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import {
-  Button,
-  FieldLabel,
-  Input,
-  Modal,
-  Textarea,
-} from "@/components/ui";
+import { Button, FieldLabel, Input, Modal, Textarea } from "@/components/ui";
 import { LABEL_COLOR_KEYS, PRIORITY_STYLES, labelColor } from "@/lib/colors";
+import { contextIcon } from "@/lib/context-icons";
+import { PRIORITY_ICONS } from "@/lib/priority-icons";
 import { fromDateInputValue, toDateInputValue } from "@/lib/dates";
 import { PRIORITIES, type Priority } from "@/db/schema";
-import type { ClientColumn, ClientLabel, ClientTask } from "@/lib/types";
+import type {
+  ClientColumn,
+  ClientContext,
+  ClientLabel,
+  ClientTask,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+const SELECT =
+  "h-9 w-full rounded-lg bg-panel-raised px-2 text-sm text-ink ring-1 ring-hairline focus:ring-accent/60";
 
 export type TaskPatch = {
   title: string;
@@ -22,12 +26,14 @@ export type TaskPatch = {
   priority: Priority;
   dueDate: number | null;
   labelIds: string[];
+  contextIds: string[];
 };
 
 type Props = {
   task: ClientTask;
   columns: ClientColumn[];
   labels: ClientLabel[];
+  contexts: ClientContext[];
   onClose: () => void;
   onSave: (patch: TaskPatch) => void;
   onMoveToColumn: (columnId: string) => void;
@@ -40,6 +46,7 @@ export function TaskDialog({
   task,
   columns,
   labels,
+  contexts,
   onClose,
   onSave,
   onMoveToColumn,
@@ -53,6 +60,7 @@ export function TaskDialog({
     priority: task.priority,
     dueDate: task.dueDate,
     labelIds: task.labelIds,
+    contextIds: task.contextIds,
   });
 
   const dirty = useMemo(
@@ -61,6 +69,7 @@ export function TaskDialog({
       draft.description !== task.description ||
       draft.priority !== task.priority ||
       draft.dueDate !== task.dueDate ||
+      draft.contextIds.join() !== task.contextIds.join() ||
       draft.labelIds.join() !== task.labelIds.join(),
     [draft, task],
   );
@@ -120,14 +129,14 @@ export function TaskDialog({
         </>
       }
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div className="grid grid-cols-2 gap-3">
           <label>
             <FieldLabel>Column</FieldLabel>
             <select
               value={task.columnId}
               onChange={(e) => onMoveToColumn(e.target.value)}
-              className="h-9 w-full rounded-lg bg-panel-raised px-2 text-sm text-ink ring-1 ring-hairline focus:ring-accent/60"
+              className={SELECT}
             >
               {columns.map((column) => (
                 <option key={column.id} value={column.id}>
@@ -155,21 +164,67 @@ export function TaskDialog({
         <div>
           <FieldLabel>Priority</FieldLabel>
           <div className="flex gap-1 rounded-lg bg-panel p-1 ring-1 ring-hairline">
-            {PRIORITIES.map((priority) => (
-              <button
-                key={priority}
-                type="button"
-                onClick={() => setDraft((d) => ({ ...d, priority }))}
-                className={cn(
-                  "flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
-                  draft.priority === priority
-                    ? cn("bg-panel-raised shadow-sm shadow-[#3a332a]/10", PRIORITY_STYLES[priority].chip)
-                    : "text-ink-faint hover:bg-black/5",
-                )}
-              >
-                {PRIORITY_STYLES[priority].label}
-              </button>
-            ))}
+            {PRIORITIES.map((priority) => {
+              const Icon = PRIORITY_ICONS[priority];
+              return (
+                <button
+                  key={priority}
+                  type="button"
+                  onClick={() => setDraft((d) => ({ ...d, priority }))}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                    draft.priority === priority
+                      ? cn(
+                          "bg-panel-raised shadow-sm shadow-shade/10",
+                          PRIORITY_STYLES[priority].chip,
+                        )
+                      : "text-ink-faint hover:bg-black/5",
+                  )}
+                >
+                  <Icon className="size-3.5" />
+                  {PRIORITY_STYLES[priority].label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <FieldLabel>Contexts</FieldLabel>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {contexts.map((context) => {
+              const Icon = contextIcon(context.name);
+              const on = draft.contextIds.includes(context.id);
+              return (
+                <button
+                  key={context.id}
+                  type="button"
+                  onClick={() =>
+                    setDraft((d) => ({
+                      ...d,
+                      contextIds: on
+                        ? d.contextIds.filter((id) => id !== context.id)
+                        : [...d.contextIds, context.id],
+                    }))
+                  }
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset transition-colors",
+                    on
+                      ? "bg-black/5 text-ink ring-black/8"
+                      : "bg-transparent text-ink-faint ring-hairline hover:text-ink",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "mr-0.5 size-1.5 rounded-full",
+                      labelColor(context.color).dot,
+                    )}
+                  />
+                  <Icon className="size-3.5 opacity-70" />
+                  {context.name}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -274,7 +329,7 @@ function LabelPicker({
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-faint ring-1 ring-dashed ring-hairline-strong transition-colors hover:text-ink"
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-faint outline outline-1 outline-dashed -outline-offset-1 outline-hairline-strong transition-colors hover:text-ink"
         >
           <Plus className="size-3" /> <Tag className="size-3" />
         </button>

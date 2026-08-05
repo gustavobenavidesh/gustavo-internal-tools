@@ -1,25 +1,96 @@
 @import "tailwindcss";
 
+/**
+ * Die Grotesk is a licensed face installed on this machine, not a webfont, so
+ * it's pulled in with `local()`. Each weight is declared separately because the
+ * OTFs ship as separate families ("Die Grotesk A Medium"), which the browser
+ * would otherwise never pick for `font-weight: 500` — it would synthesise from
+ * Regular instead. Both the full name and the PostScript name are listed since
+ * browsers differ on which they match.
+ */
+@font-face {
+  font-family: "Die Grotesk";
+  src: local("Die Grotesk A Light"), local("DieGrotesk-A-Light");
+  font-weight: 300;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Die Grotesk";
+  src: local("Die Grotesk A"), local("DieGrotesk-A-Regular");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Die Grotesk";
+  src: local("Die Grotesk A Italic"), local("DieGrotesk-A-Italic");
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Die Grotesk";
+  src: local("Die Grotesk A Medium"), local("DieGrotesk-A-Medium");
+  font-weight: 500;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Die Grotesk";
+  src: local("Die Grotesk A Medium Italic"), local("DieGrotesk-A-MediumItalic");
+  font-weight: 500;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Die Grotesk";
+  src: local("Die Grotesk A Bold"), local("DieGrotesk-A-Bold");
+  font-weight: 600 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Die Grotesk";
+  src: local("Die Grotesk A Bold Italic"), local("DieGrotesk-A-BoldItalic");
+  font-weight: 600 700;
+  font-style: italic;
+}
+
 @theme {
-  /* Warm beige paper: the canvas is the darkest surface and cards the
-     lightest, so stacking reads as light rising toward you. */
-  --color-canvas: #f0e9db;
-  --color-panel: #e7ded0;
-  --color-panel-raised: #fdfbf6;
-  --color-hairline: #d8ccb8;
-  --color-hairline-strong: #c4b59c;
+  /* Warm neutral off-white — barely any chroma, closer to paper grey than
+     beige. Surfaces step lightest-in-the-middle rather than monotonically: the
+     canvas holds the sidebar, the board card sits lighter on top of it, columns
+     recede again inside that card, and only the task cards are pure white. */
+  --color-canvas: #f1f0ed;
+  --color-surface: #f9f8f6;
+  --color-panel: #eeedea;
+  --color-panel-raised: #ffffff;
+  --color-hairline: #e6e4e0;
+  --color-hairline-strong: #d3d1cc;
 
-  /* Warm greys instead of neutral ones — pure grey looks dirty on beige. */
-  --color-ink: #3a332a;
-  --color-ink-soft: #6d6355;
-  --color-ink-faint: #9c9080;
-  --color-ink-ghost: #b6ab99;
+  /* Near-neutral greys with a trace of warmth, so nothing looks blue-shifted. */
+  --color-ink: #1e1d1b;
+  --color-ink-soft: #605e5a;
+  --color-ink-faint: #7a7771;
+  --color-ink-ghost: #adaaa4;
 
-  --color-accent: #9a5a34;
-  --color-accent-soft: #c08b60;
+  /* Shadows are tinted with the ink rather than black; black goes grey here. */
+  --color-shade: #1e1d1b;
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Apple's system blue. `accent` is for fills, rings and focus; `accent-ink`
+     is the darker step for accent-coloured *text*, which needs 4.5:1 on white
+     that the bright blue can't reach. */
+  --color-accent: #007aff;
+  --color-accent-ink: #0063d1;
+  --color-accent-soft: #9dcaff;
+
+  /* Geist stays as the fallback for anywhere Die Grotesk isn't installed. */
+  --font-sans:
+    "Die Grotesk", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+:root {
+  /* The header sits to the right of the sidebar, so anything that needs to be
+     centred on the *viewport* has to compensate by half the sidebar width less
+     half the board's right gutter. Kept here so the two can't drift apart. */
+  --sidebar-width: 236px;
+  --board-gutter: 0.875rem;
 }
 
 html,
@@ -31,6 +102,9 @@ body {
   background: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  /* Die Grotesk sets a touch wide at UI sizes; a hair of negative tracking
+     tightens words without closing up the letterforms. */
+  letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
 }
