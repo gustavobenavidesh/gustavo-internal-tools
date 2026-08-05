@@ -251,7 +251,7 @@ export function TaskCardBody({
       </div>
 
       {task.subtasks.length > 0 && (
-        <ul className="mt-3 space-y-1">
+        <ul className="mt-3.5 space-y-1">
           {task.subtasks.map((sub) => (
             <li key={sub.id}>
               <button
@@ -291,7 +291,7 @@ export function TaskCardBody({
         </ul>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-1.5">
+      <div className="mt-[18px] flex flex-wrap items-center gap-1.5">
         {assigned.map((option, i) => {
           const ContextIcon = contextIcon(option.name);
           // The + docks onto the last pill, so that one squares off its right.
@@ -300,13 +300,13 @@ export function TaskCardBody({
             <PillMenu
               key={option.id}
               className={cn(
-                muted
-                  ? "bg-transparent text-ink-faint ring-0 outline outline-1 outline-dashed -outline-offset-1 outline-hairline-strong"
-                  : done
-                    ? // White, not the canvas tone: on the green fill of a
-                      // finished card the grey pill all but disappears.
-                      "bg-panel-raised text-ink-soft ring-emerald-600/15"
-                    : "bg-canvas text-ink-soft ring-hairline",
+                // A parked card is dashed, but what's *assigned* to it isn't —
+                // only genuinely empty slots get the placeholder treatment.
+                done
+                  ? // White, not the canvas tone: on the green fill of a
+                    // finished card the grey pill all but disappears.
+                    "bg-panel-raised text-ink-soft ring-emerald-600/15"
+                  : "bg-canvas text-ink-soft ring-hairline",
                 docked && "pr-2.5",
               )}
               style={
@@ -340,11 +340,9 @@ export function TaskCardBody({
               // divider rather than a double line.
               className={cn(
                 "-ml-[7px] w-6 justify-center px-0",
-                muted
-                  ? "bg-transparent text-ink-ghost ring-0 outline outline-1 outline-dashed -outline-offset-1 outline-hairline-strong"
-                  : done
-                    ? "bg-panel-raised text-ink-faint ring-emerald-600/15 hover:text-ink-soft"
-                    : "bg-canvas text-ink-faint ring-hairline hover:text-ink-soft",
+                done
+                  ? "bg-panel-raised text-ink-faint ring-emerald-600/15 hover:text-ink-soft"
+                  : "bg-canvas text-ink-faint ring-hairline hover:text-ink-soft",
               )}
               style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}
               label=""

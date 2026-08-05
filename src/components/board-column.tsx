@@ -130,7 +130,9 @@ export function BoardColumn({
         // Only the featured column is a surface at all — the rest float
         // directly on the board with no fill and no ring, so emphasis comes
         // from what's absent everywhere else.
-        column.isFocus ? "bg-canvas ring-1 ring-hairline" : "bg-transparent",
+        column.isFocus
+          ? "paper-grain bg-canvas ring-1 ring-hairline"
+          : "bg-transparent",
         isDragging && "opacity-40",
       )}
     >

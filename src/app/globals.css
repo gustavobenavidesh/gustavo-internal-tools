@@ -102,6 +102,12 @@
      half the board's right gutter. Kept here so the two can't drift apart. */
   --sidebar-width: 236px;
   --board-gutter: 0.875rem;
+
+  /* Paper grain, shared by the app background and the `paper-grain` utility so
+     the two can't drift out of step. */
+  --grain: url("data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20width='140'%20height='140'><filter%20id='p'%20x='0'%20y='0'%20width='100%25'%20height='100%25'><feTurbulence%20type='fractalNoise'%20baseFrequency='0.6'%20numOctaves='3'%20stitchTiles='stitch'/><feColorMatrix%20type='saturate'%20values='0'/></filter><rect%20width='140'%20height='140'%20filter='url%28%23p%29'/></svg>");
+  --grain-size: 140px;
+  --grain-opacity: 0.22;
 }
 
 html,
@@ -118,6 +124,27 @@ body {
   letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+}
+
+/**
+ * Paper grain on the app background. A fixed pseudo-element at `z-index: -1`, so
+ * it sits above the canvas colour but beneath every card and panel — the texture
+ * shows in the gaps without dirtying the surfaces on top of it. The noise is a
+ * tiled SVG `feTurbulence`, which costs one small data URI instead of an image
+ * request, and `stitchTiles` keeps the seams invisible.
+ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* Grain is a balance of two dials: opacity and how coarse the noise is. A
+     lower `baseFrequency` gives it visible structure, which reads as paper at a
+     lower opacity than fine noise needs. */
+  opacity: var(--grain-opacity);
+  background-image: var(--grain);
+  background-size: var(--grain-size) var(--grain-size);
 }
 
 @layer base {
@@ -218,6 +245,29 @@ body {
     #000 calc(100% - var(--fade-right, 0px)),
     #0000 100%
   );
+}
+
+/**
+ * The same paper as the app background, for a surface that sits on top of it and
+ * would otherwise cover it. `z-index: -1` puts the grain above the element's own
+ * background but below its content, and `border-radius: inherit` keeps it inside
+ * rounded corners.
+ */
+@utility paper-grain {
+  position: relative;
+  isolation: isolate;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: var(--grain-opacity);
+    background-image: var(--grain);
+    background-size: var(--grain-size) var(--grain-size);
+  }
 }
 
 @utility scrollbar-none {

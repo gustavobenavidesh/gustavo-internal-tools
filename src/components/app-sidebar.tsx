@@ -355,7 +355,7 @@ function SidebarRow({
   return (
     <div
       className={cn(
-        "group flex items-center rounded-lg pl-1 pr-1 transition-colors",
+        "group flex items-center rounded-lg px-[5px] transition-colors",
         active ? "bg-black/5" : "hover:bg-black/3",
       )}
     >

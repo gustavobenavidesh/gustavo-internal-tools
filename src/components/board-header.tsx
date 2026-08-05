@@ -67,7 +67,7 @@ export function BoardHeader({
               e.currentTarget.blur();
             }
           }}
-          className="h-9 w-[26rem] rounded-full bg-field pl-10 pr-8 placeholder:text-ink-faint"
+          className="h-8 w-[26rem] rounded-full bg-white/35 pl-10 pr-8 shadow-[0_1px_22px_-2px] shadow-shade/10 placeholder:text-ink-faint"
         />
         {filters.query ? (
           <IconButton
