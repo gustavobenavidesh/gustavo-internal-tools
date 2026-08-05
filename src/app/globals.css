@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+@theme {
+  /* Warm beige paper: the canvas is the darkest surface and cards the
+     lightest, so stacking reads as light rising toward you. */
+  --color-canvas: #f0e9db;
+  --color-panel: #e7ded0;
+  --color-panel-raised: #fdfbf6;
+  --color-hairline: #d8ccb8;
+  --color-hairline-strong: #c4b59c;
+
+  /* Warm greys instead of neutral ones — pure grey looks dirty on beige. */
+  --color-ink: #3a332a;
+  --color-ink-soft: #6d6355;
+  --color-ink-faint: #9c9080;
+  --color-ink-ghost: #b6ab99;
+
+  --color-accent: #9a5a34;
+  --color-accent-soft: #c08b60;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+@layer base {
+  /* Slim scrollbars: the board is a horizontal scroller and the default macOS
+     bars sit on top of the column content. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-hairline) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--color-hairline);
+    border: 3px solid transparent;
+    border-radius: 9999px;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-hairline-strong);
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-accent-soft) 45%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.45;
+    cursor: pointer;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 0.8;
+  }
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-pop-in {
+  animation: pop-in 120ms ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@utility animate-fade-in {
+  animation: fade-in 120ms ease-out;
+}
