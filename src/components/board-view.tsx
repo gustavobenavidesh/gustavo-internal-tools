@@ -34,6 +34,7 @@ import {
 import * as actions from "@/app/actions";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BoardColumn } from "@/components/board-column";
+import { Plate } from "@/components/ui";
 import {
   BoardHeader,
   type Filters,
@@ -636,8 +637,37 @@ export function BoardView({
           onAddColumn={addColumn}
         />
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[26px] bg-surface shadow-lg shadow-shade/8 ring-1 ring-hairline">
+        {/* The card's fill, hairline and shadow are drawn on a plate *behind*
+            the content rather than on the content's own box. Clipping this box to
+            the superellipse would also clip the `DragOverlay`, which is
+            `position: fixed` and rendered inside this subtree — today it escapes
+            because `overflow: hidden` doesn't clip fixed descendants, and a clip
+            path would. The content keeps its circular corner for that clipping,
+            which is strictly inside the squircle, so what shows in the corners is
+            the plate. */}
+        <div
+          className="relative flex min-h-0 flex-1 flex-col"
+          style={
+            {
+              "--sq-radius": "var(--corner-board)",
+            } as CSSProperties
+          }
+        >
+          <Plate
+            face="var(--color-surface)"
+            edge="var(--color-hairline)"
+            shadow="squircle-shadow-lg"
+          />
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--corner-board)]">
           <DndContext
+            /* Without an explicit id, dnd-kit names its hidden drag description
+               from a module-level counter — which the server process keeps
+               incrementing across requests while every fresh page load starts
+               back at 0. The `aria-describedby` it writes onto each drag handle
+               then differs between the server HTML and the first client render,
+               which React reports as a hydration mismatch. A fixed id takes the
+               counter out of the path. */
+            id="board-dnd"
             sensors={sensors}
             collisionDetection={collisionDetection}
             onDragStart={onDragStart}
@@ -790,6 +820,7 @@ export function BoardView({
               ) : null}
             </DragOverlay>
           </DndContext>
+          </div>
         </div>
       </main>
 
@@ -830,9 +861,20 @@ export function BoardView({
       {error && (
         <div
           role="alert"
-          className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 animate-pop-in rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-900 shadow-lg shadow-shade/8 ring-1 ring-rose-600/25"
+          className="fixed bottom-4 left-1/2 isolate z-50 -translate-x-1/2 animate-pop-in rounded-[var(--corner-chip)] text-xs text-rose-900 shadow-lg shadow-shade/8"
+          style={
+            {
+              "--sq-radius": "var(--corner-chip)",
+            } as CSSProperties
+          }
         >
-          {error} — reloading from the database.
+          <Plate
+            face="var(--color-rose-50)"
+            edge="color-mix(in oklab, var(--color-rose-600) 25%, transparent)"
+          />
+          <div className="squircle px-3 py-2">
+            {error} — reloading from the database.
+          </div>
         </div>
       )}
     </div>

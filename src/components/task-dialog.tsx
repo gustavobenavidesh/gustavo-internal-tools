@@ -2,13 +2,14 @@
 
 import { format } from "date-fns";
 import { Archive, Check, Plus, Tag, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type CSSProperties, useMemo, useState } from "react";
 import {
   Button,
   FieldLabel,
   IconButton,
   Input,
   Modal,
+  Plate,
   Textarea,
 } from "@/components/ui";
 import { LABEL_COLOR_KEYS, PRIORITY_STYLES, labelColor } from "@/lib/colors";
@@ -179,7 +180,16 @@ export function TaskDialog({
 
         <div>
           <FieldLabel>Priority</FieldLabel>
-          <div className="flex gap-1 rounded-lg bg-panel p-1 ring-1 ring-hairline">
+          <div
+                className="relative isolate flex gap-1 rounded-[var(--corner-control)] p-1"
+                style={
+                  { "--sq-radius": "var(--corner-control)" } as CSSProperties
+                }
+              >
+                <Plate
+                  face="var(--color-panel)"
+                  edge="var(--color-hairline)"
+                />
             {PRIORITIES.map((priority) => {
               return (
                 <button

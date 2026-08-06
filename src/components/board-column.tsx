@@ -22,7 +22,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Button, IconButton, Input, useDismiss } from "@/components/ui";
+import { Button, IconButton, Input, Plate, useDismiss } from "@/components/ui";
 import { TaskCard } from "@/components/task-card";
 import type { Priority } from "@/db/schema";
 import type {
@@ -124,18 +124,32 @@ export function BoardColumn({
   return (
     <section
       ref={setNodeRef}
-      style={{ transform: CSS.Translate.toString(transform), transition }}
+      style={
+        {
+          transform: CSS.Translate.toString(transform),
+          transition,
+          ...(column.isFocus && {
+            "--sq-radius": "var(--corner-panel)",
+          }),
+        } as CSSProperties
+      }
       className={cn(
-        "flex h-full w-[312px] shrink-0 flex-col rounded-2xl",
+        "flex h-full w-[312px] shrink-0 flex-col",
         // Only the featured column is a surface at all — the rest float
         // directly on the board with no fill and no ring, so emphasis comes
-        // from what's absent everywhere else.
-        column.isFocus
-          ? "paper-grain bg-canvas ring-1 ring-hairline"
-          : "bg-transparent",
+        // from what's absent everywhere else. Which is also why only it needs a
+        // corner: a radius on a transparent box is invisible.
+        column.isFocus && "relative isolate",
         isDragging && "opacity-40",
       )}
     >
+      {/* Fill, hairline and paper, all following the continuous corner. `isolate`
+          keeps the negative z-index inside this column, and is scoped to the
+          featured one so the other columns don't gain a stacking context they
+          have no use for. */}
+      {column.isFocus && (
+        <Plate face="var(--color-canvas)" edge="var(--color-hairline)" grain />
+      )}
       <header className="flex items-center gap-1 px-3 pb-2.5 pt-3">
         {/* The status glyph is also the drag handle — a grip alongside it was
             just noise. */}
@@ -350,8 +364,13 @@ function Composer({
   return (
     <div
       ref={wrapperRef}
-      className="rounded-xl bg-panel-raised p-2.5 ring-1 ring-accent/40"
+      className="relative isolate rounded-[var(--corner-card)] p-2.5"
+      style={{ "--sq-radius": "var(--corner-card)" } as CSSProperties}
     >
+      <Plate
+        face="var(--color-panel-raised)"
+        edge="color-mix(in oklab, var(--color-accent) 40%, transparent)"
+      />
       <textarea
         ref={ref}
         rows={2}
@@ -411,7 +430,11 @@ function ColumnMenu({
     "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink transition-colors hover:bg-black/5 disabled:opacity-40";
 
   return (
-    <div className="absolute right-0 top-9 z-30 w-56 animate-pop-in rounded-xl bg-panel-raised p-2 shadow-xl shadow-shade/15 ring-1 ring-hairline">
+    <div
+      className="absolute right-0 top-9 z-30 isolate w-56 animate-pop-in rounded-[var(--corner-menu)] p-2 shadow-xl shadow-shade/15"
+      style={{ "--sq-radius": "var(--corner-menu)" } as CSSProperties}
+    >
+      <Plate face="var(--color-panel-raised)" edge="var(--color-hairline)" />
       <button
         type="button"
         className={item}

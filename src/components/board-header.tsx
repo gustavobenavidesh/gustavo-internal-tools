@@ -1,8 +1,10 @@
 "use client";
 
 import { ListFilter, Plus, Search, X } from "lucide-react";
-import { type RefObject, useState } from "react";
-import { Button, IconButton, Input, KBD, useDismiss } from "@/components/ui";
+import {
+  type CSSProperties, type RefObject, useState
+} from "react";
+import { Button, IconButton, Input, KBD, Plate, useDismiss } from "@/components/ui";
 import { PRIORITIES, type Priority } from "@/db/schema";
 import { PRIORITY_STYLES, labelColor } from "@/lib/colors";
 import type { ClientLabel } from "@/lib/types";
@@ -155,7 +157,11 @@ function FilterMenu({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-9 z-40 w-64 animate-pop-in space-y-3 rounded-xl bg-panel-raised p-3 shadow-xl shadow-shade/15 ring-1 ring-hairline">
+        <div
+          className="absolute right-0 top-9 z-40 isolate w-64 animate-pop-in space-y-3 rounded-[var(--corner-menu)] p-3 shadow-xl shadow-shade/15"
+          style={{ "--sq-radius": "var(--corner-menu)" } as CSSProperties}
+        >
+          <Plate face="var(--color-panel-raised)" edge="var(--color-hairline)" />
           <div>
             <p className="mb-1.5 text-[10px] uppercase tracking-wider text-ink-faint">
               Priority

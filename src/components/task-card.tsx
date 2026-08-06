@@ -212,22 +212,48 @@ export function TaskCardBody({
   return (
     <div
       className={cn(
-        "group relative w-full cursor-grab overflow-hidden rounded-xl p-4 text-left ring-1 transition-[box-shadow,transform,background-color]",
-        // Parked cards read as inactive: flat, dashed and barely filled.
+        "group relative isolate w-full cursor-grab rounded-[var(--corner-card)] text-left transition-[box-shadow,transform]",
+        // The shadow stays a box-shadow on this root, which is deliberately left
+        // unclipped. Moving it onto the plate would mean a `filter` — and so a
+        // repaint layer — per card during a drag, and at a 12px radius the gap
+        // between the shadow's circular silhouette and the squircle sitting on
+        // top of it disappears under the blur.
+        //
+        // Parked cards read as inactive: flat, dashed and barely filled. Their
+        // dash is the one thing that can't move onto the plate — there's no way
+        // to stroke a dashed superellipse in CSS — so it stays an `outline` here,
+        // which is also why this root must not be clipped: a clip path eats
+        // outlines, including the focus ring.
         muted
-          ? "bg-transparent ring-0 outline outline-2 outline-dashed -outline-offset-2 outline-hairline"
-          : cn(
-              "shadow-sm shadow-shade/10 hover:shadow-shade/15",
-              done
-                ? "bg-done ring-emerald-600/15 hover:ring-emerald-600/25"
-                : "bg-panel-raised ring-hairline hover:ring-hairline-strong",
-            ),
+          ? "outline outline-2 outline-dashed -outline-offset-2 outline-hairline"
+          : "shadow-[0_5px_16px_-6px] shadow-shade/16 hover:shadow-shade/24",
         overlay &&
-          "rotate-3 scale-[1.03] cursor-grabbing bg-panel-raised shadow-2xl shadow-shade/30 ring-accent/50",
+          "rotate-3 scale-[1.03] cursor-grabbing shadow-2xl shadow-shade/30",
         className,
       )}
+      style={{ "--sq-radius": "var(--corner-card)" } as CSSProperties}
       {...props}
     >
+      {/* Fill and hairline, both following the continuous corner. Parked cards
+          get no plate: they have no fill, and their edge is the dashed outline
+          above. */}
+      {!muted && (
+        <div aria-hidden className="squircle-plate -z-10">
+          <div
+            className={cn(
+              "squircle-surface size-full transition-colors",
+              overlay
+                ? "[--sq-edge:color-mix(in_oklab,var(--color-accent)_50%,transparent)] [--sq-face:var(--color-panel-raised)]"
+                : done
+                  ? "[--sq-edge:color-mix(in_oklab,var(--color-emerald-600)_15%,transparent)] [--sq-face:var(--color-done)] group-hover:[--sq-edge:color-mix(in_oklab,var(--color-emerald-600)_25%,transparent)]"
+                  : "[--sq-edge:var(--color-hairline)] [--sq-face:var(--color-panel-raised)] group-hover:[--sq-edge:var(--color-hairline-strong)]",
+            )}
+          />
+        </div>
+      )}
+      {/* Content is clipped to the same shape, standing in for the
+          `overflow-hidden` this used to carry on the root. */}
+      <div className="squircle p-4">
       {/* The tick shares the title's row, so a long title wraps against it
           rather than running underneath. */}
       <div className="flex items-start gap-2">
@@ -422,6 +448,7 @@ export function TaskCardBody({
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

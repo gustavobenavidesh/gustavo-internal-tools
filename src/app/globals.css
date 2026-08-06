@@ -108,6 +108,26 @@
   --grain: url("data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20width='140'%20height='140'><filter%20id='p'%20x='0'%20y='0'%20width='100%25'%20height='100%25'><feTurbulence%20type='fractalNoise'%20baseFrequency='0.6'%20numOctaves='3'%20stitchTiles='stitch'/><feColorMatrix%20type='saturate'%20values='0'/></filter><rect%20width='140'%20height='140'%20filter='url%28%23p%29'/></svg>");
   --grain-size: 140px;
   --grain-opacity: 0.22;
+
+  /* How smooth the corners are — the one dial for the shape itself. 0.448 is a
+     plain circular arc, 0.091 is a full squircle, and this sits near the middle,
+     around the 60% that gets quoted for Apple's corners. The `squircle` utility
+     has the scale and how it's derived. */
+  --corner-smooth: 0.19;
+
+  /* Corner radii, in one place because the squircle needs each of them twice:
+     once as `--sq-radius` for the clip path, and once as a `border-radius` on the
+     unclipped root that still casts the box-shadow.
+
+     They sit ~25% above the values they replaced, because a smoothed corner turns
+     later than a circular one and so reads sharper at an equal radius. Raising the
+     number buys the softness back without giving up the shape. */
+  --corner-board: 32px;
+  --corner-panel: 20px;
+  --corner-card: 20px;
+  --corner-menu: 16px;
+  --corner-control: 10px;
+  --corner-chip: 11px;
 }
 
 html,
@@ -268,6 +288,155 @@ body::before {
     background-image: var(--grain);
     background-size: var(--grain-size) var(--grain-size);
   }
+}
+
+/**
+ * Apple's continuous corner ("squircle"), drawn by hand.
+ *
+ * `corner-shape: squircle` would say this in one line, but it is Chromium-only —
+ * WebKit has no implementation as of Safari 26.6, and this board runs in Safari.
+ * So the superellipse is drawn as a `clip-path: shape()`, which WebKit has had
+ * since 18.4, and which mixes px with % freely, so one path fits any box size
+ * with nothing to recompute on resize.
+ *
+ * One cubic Bézier per corner, and the whole shape is one number: how far the
+ * control points sit from the corner point, as a fraction of the radius. That's
+ * `--corner-smooth`. Pull the control points out toward the corner and the curve
+ * hugs it (square); let them fall back along the tangents and it rounds off.
+ *
+ * Matching the Bézier's midpoint to a true superellipse's — which sits r·2^(-1/n)
+ * in from the corner along the diagonal — gives the exact fraction per exponent:
+ *
+ *   0.448  exponent 2, a plain circular arc — Figma's 0% smoothing
+ *   0.19   exponent ~3.2 — about Figma's 60%, which is the figure quoted for
+ *          Apple's own corners, and what this is set to
+ *   0.091  exponent 4, the full squircle — `corner-shape: squircle`, Figma's 100%
+ *   0.012  exponent 5, close to square
+ *
+ * The mapping from Figma's percentage onto an exponent is approximate: Figma
+ * smooths with an arc plus two Bézier segments rather than a superellipse, so
+ * there's no exact equivalence to be had. Treat the number as a dial, not a spec.
+ *
+ * `--sq-radius` is the radius, and stands in for `border-radius` — the real
+ * `border-radius` is irrelevant once a clip path is drawing the shape.
+ */
+@utility squircle {
+  --sq-c: calc(var(--sq-radius) * var(--corner-smooth));
+  clip-path: shape(
+    from 0 var(--sq-radius),
+    curve to var(--sq-radius) 0 with 0 var(--sq-c) / var(--sq-c) 0,
+    line to calc(100% - var(--sq-radius)) 0,
+    curve to 100% var(--sq-radius) with calc(100% - var(--sq-c)) 0 / 100%
+      var(--sq-c),
+    line to 100% calc(100% - var(--sq-radius)),
+    curve to calc(100% - var(--sq-radius)) 100% with 100%
+      calc(100% - var(--sq-c)) / calc(100% - var(--sq-c)) 100%,
+    line to var(--sq-radius) 100%,
+    curve to 0 calc(100% - var(--sq-radius)) with var(--sq-c) 100% / 0
+      calc(100% - var(--sq-c)),
+    close
+  );
+}
+
+/**
+ * The painted face of a squircle surface: fill plus a 1px edge, both following
+ * the superellipse. The edge is the element's own background showing through
+ * where the fill — a pseudo-element inset by 1px, with its radius reduced to
+ * match — doesn't reach. A `ring` couldn't do it: box shadows are painted before
+ * the clip and would be cut away with everything else outside the shape, and
+ * they'd trace a circular corner regardless.
+ *
+ * The path is spelled out a second time rather than shared with `squircle`,
+ * because the inner one needs its own radius and a custom property can't be
+ * defined in terms of itself.
+ *
+ * `--sq-grain` optionally lays the app's paper over the fill; it's on `::after`
+ * so it paints above it, since `::before` is already spoken for.
+ */
+@utility squircle-surface {
+  position: relative;
+  background: var(--sq-edge, transparent);
+  --sq-c: calc(var(--sq-radius) * var(--corner-smooth));
+  clip-path: shape(
+    from 0 var(--sq-radius),
+    curve to var(--sq-radius) 0 with 0 var(--sq-c) / var(--sq-c) 0,
+    line to calc(100% - var(--sq-radius)) 0,
+    curve to 100% var(--sq-radius) with calc(100% - var(--sq-c)) 0 / 100%
+      var(--sq-c),
+    line to 100% calc(100% - var(--sq-radius)),
+    curve to calc(100% - var(--sq-radius)) 100% with 100%
+      calc(100% - var(--sq-c)) / calc(100% - var(--sq-c)) 100%,
+    line to var(--sq-radius) 100%,
+    curve to 0 calc(100% - var(--sq-radius)) with var(--sq-c) 100% / 0
+      calc(100% - var(--sq-c)),
+    close
+  );
+
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    --sq-ir: calc(var(--sq-radius) - 1px);
+    --sq-ic: calc(var(--sq-ir) * var(--corner-smooth));
+    clip-path: shape(
+      from 0 var(--sq-ir),
+      curve to var(--sq-ir) 0 with 0 var(--sq-ic) / var(--sq-ic) 0,
+      line to calc(100% - var(--sq-ir)) 0,
+      curve to 100% var(--sq-ir) with calc(100% - var(--sq-ic)) 0 / 100%
+        var(--sq-ic),
+      line to 100% calc(100% - var(--sq-ir)),
+      curve to calc(100% - var(--sq-ir)) 100% with 100% calc(100% - var(--sq-ic)) /
+        calc(100% - var(--sq-ic)) 100%,
+      line to var(--sq-ir) 100%,
+      curve to 0 calc(100% - var(--sq-ir)) with var(--sq-ic) 100% / 0
+        calc(100% - var(--sq-ic)),
+      close
+    );
+  }
+
+  &::before {
+    background: var(--sq-face, transparent);
+  }
+
+  &::after {
+    pointer-events: none;
+    opacity: var(--grain-opacity);
+    background-image: var(--sq-grain, none);
+    background-size: var(--grain-size) var(--grain-size);
+  }
+}
+
+/**
+ * Holds a `squircle-surface` behind an element's content, and carries its shadow.
+ *
+ * The shadow has to sit on an ancestor of the clipped box rather than on it:
+ * filters are applied before the clip, so a `drop-shadow` on the shape itself
+ * would be clipped away along with the shadow it was meant to cast. `drop-shadow`
+ * has no spread, so the stacked pair below stands in for Tailwind's presets,
+ * whose negative spreads can't be expressed.
+ */
+@utility squircle-plate {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  filter: var(--sq-shadow, none);
+}
+
+@utility squircle-shadow-lg {
+  --sq-shadow: drop-shadow(
+      0 8px 12px color-mix(in oklab, var(--color-shade) 8%, transparent)
+    )
+    drop-shadow(0 2px 4px color-mix(in oklab, var(--color-shade) 5%, transparent));
+}
+
+@utility squircle-shadow-2xl {
+  --sq-shadow: drop-shadow(
+      0 16px 28px color-mix(in oklab, var(--color-shade) 20%, transparent)
+    )
+    drop-shadow(
+      0 4px 8px color-mix(in oklab, var(--color-shade) 10%, transparent)
+    );
 }
 
 @utility scrollbar-none {

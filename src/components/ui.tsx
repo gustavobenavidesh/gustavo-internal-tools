@@ -14,36 +14,112 @@ import {
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
+/**
+ * The squircle surface for an element that can't be clipped to the shape itself —
+ * which is most of them: a clip path eats `outline`, and `outline` is what
+ * `:focus-visible` draws, so anything focusable has to keep its box intact. This
+ * sits behind the content instead and paints the fill, the 1px edge and
+ * optionally the shadow.
+ *
+ * The host needs `relative isolate` and a `--sq-radius`. The colours are set here
+ * rather than on the host on purpose: custom properties inherit, and a `--sq-face`
+ * or `--sq-grain` left on a container leaks into every squircle nested inside it —
+ * which is exactly how the featured column ended up tinting its own cards.
+ */
+export function Plate({
+  face,
+  edge,
+  shadow,
+  grain,
+  surfaceClassName,
+}: {
+  face?: string;
+  edge?: string;
+  /** A `squircle-shadow-*` utility, or any `drop-shadow` via `--sq-shadow`. */
+  shadow?: string;
+  grain?: boolean;
+  /** For hover and state variants, which belong on the painted surface. */
+  surfaceClassName?: string;
+}) {
+  return (
+    <div
+      aria-hidden
+      className={cn("squircle-plate -z-10", shadow)}
+      style={
+        {
+          ...(face && { "--sq-face": face }),
+          ...(edge && { "--sq-edge": edge }),
+          ...(grain && { "--sq-grain": "var(--grain)" }),
+        } as CSSProperties
+      }
+    >
+      <div className={cn("squircle-surface size-full", surfaceClassName)} />
+    </div>
+  );
+}
+
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "ghost" | "subtle" | "danger";
   size?: "sm" | "md";
 };
 
-const VARIANTS: Record<NonNullable<ButtonProps["variant"]>, string> = {
-  primary:
-    "bg-accent text-white hover:bg-accent-ink shadow-sm shadow-accent/25 disabled:bg-accent/40",
-  subtle: "bg-surface text-ink hover:bg-panel-raised ring-1 ring-hairline",
-  ghost: "text-ink-soft hover:text-ink hover:bg-black/5",
-  danger: "text-rose-700 hover:text-rose-800 hover:bg-rose-500/10",
+/**
+ * Split in two because the fill and the edge move onto the button's plate while
+ * the text, and any shadow, stay on the button itself — it has to keep its box so
+ * `:focus-visible` still has something to outline. `disabled:opacity-60` on the
+ * root covers the plate too, since the plate is a child, which is why `primary`
+ * no longer needs a separate disabled fill.
+ */
+const VARIANTS: Record<
+  NonNullable<ButtonProps["variant"]>,
+  { root: string; surface: string }
+> = {
+  primary: {
+    root: "text-white shadow-sm shadow-accent/25",
+    surface:
+      "[--sq-face:var(--color-accent)] group-hover:[--sq-face:var(--color-accent-ink)]",
+  },
+  subtle: {
+    root: "text-ink",
+    surface:
+      "[--sq-face:var(--color-surface)] [--sq-edge:var(--color-hairline)] group-hover:[--sq-face:var(--color-panel-raised)]",
+  },
+  ghost: {
+    root: "text-ink-soft hover:text-ink",
+    surface:
+      "group-hover:[--sq-face:color-mix(in_oklab,var(--color-shade)_5%,transparent)]",
+  },
+  danger: {
+    root: "text-rose-700 hover:text-rose-800",
+    surface:
+      "group-hover:[--sq-face:color-mix(in_oklab,var(--color-rose-500)_10%,transparent)]",
+  },
 };
 
 export function Button({
   variant = "subtle",
   size = "md",
   className,
+  children,
   ...props
 }: ButtonProps) {
   return (
     <button
       type="button"
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+        "group relative isolate inline-flex items-center justify-center gap-1.5 rounded-[var(--corner-control)] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
         size === "sm" ? "h-7 px-2 text-xs" : "h-9 px-3 text-sm",
-        VARIANTS[variant],
+        VARIANTS[variant].root,
         className,
       )}
+      style={{ "--sq-radius": "var(--corner-control)" } as CSSProperties}
       {...props}
-    />
+    >
+      <Plate
+        surfaceClassName={cn("transition-colors", VARIANTS[variant].surface)}
+      />
+      {children}
+    </button>
   );
 }
 
@@ -147,10 +223,24 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         className={cn(
-          "relative w-full animate-pop-in rounded-2xl bg-canvas shadow-2xl shadow-shade/20 ring-1 ring-hairline",
+          "relative isolate w-full animate-pop-in rounded-[var(--corner-panel)]",
           width,
         )}
+        style={
+          {
+            "--sq-radius": "var(--corner-panel)",
+          } as CSSProperties
+        }
       >
+        {/* Continuous corners: fill, hairline and shadow move onto a plate behind
+            the panel, since a clip path on the panel itself would cut off the
+            shadow it casts. `isolate` keeps the plate's negative z-index inside
+            this box rather than sending it behind the backdrop. */}
+        <Plate
+          face="var(--color-canvas)"
+          edge="var(--color-hairline)"
+          shadow="squircle-shadow-2xl"
+        />
         <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-5">
           <div className="min-w-0 flex-1">{title}</div>
           <IconButton label="Close" onClick={onClose}>
@@ -232,15 +322,25 @@ export function AnchoredMenu({
   return createPortal(
     <div
       ref={ref}
-      style={{ position: "fixed", ...style }}
+      style={
+        {
+          position: "fixed",
+          ...style,
+          "--sq-radius": "var(--corner-menu)",
+        } as CSSProperties
+      }
       // A portal escapes the DOM tree but NOT the React tree: without stopping
       // these, a click on a menu item still bubbles to the card that rendered
       // the trigger, opening the task dialog and starting a drag.
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
-      className="z-50 max-h-64 animate-pop-in overflow-y-auto rounded-xl bg-panel-raised p-1.5 shadow-xl shadow-shade/20 ring-1 ring-hairline"
+      className="isolate z-50 animate-pop-in rounded-[var(--corner-menu)] shadow-xl shadow-shade/20"
     >
-      {children}
+      {/* The scroller moved to the inner element so this one can hold the plate:
+          `absolute inset-0` inside a scrolling box resolves against the padding
+          box, so the plate would slide away with the content. */}
+      <Plate face="var(--color-panel-raised)" edge="var(--color-hairline)" />
+      <div className="squircle max-h-64 overflow-y-auto p-1.5">{children}</div>
     </div>,
     document.body,
   );

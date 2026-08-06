@@ -12,11 +12,13 @@ import {
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { startTransition, useEffect, useRef, useState } from "react";
+import {
+  type CSSProperties, startTransition, useEffect, useRef, useState
+} from "react";
 import * as actions from "@/app/actions";
 import { hourlyHistoryFact, nextHistoryFact } from "@/app/fact-action";
 import { JuniorMark } from "@/components/junior-mark";
-import { IconButton, Input, KBD, useDismiss } from "@/components/ui";
+import { IconButton, Input, KBD, Plate, useDismiss } from "@/components/ui";
 import { LABEL_COLOR_KEYS, labelColor } from "@/lib/colors";
 import { contextIcon } from "@/lib/context-icons";
 import type { HistoryFact } from "@/lib/history-fact";
@@ -162,8 +164,14 @@ export function AppSidebar({
           onClick={onNewTask}
           title="New task — press N, or ⌥N from a field"
           // Card-coloured on purpose: it's the thing that makes cards.
-          className="flex w-full items-center gap-2 rounded-xl bg-panel-raised px-3 py-2.5 text-[13px] font-medium text-ink shadow-sm shadow-shade/10 ring-1 ring-hairline transition-all duration-100 ease-out hover:shadow-shade/15 hover:ring-hairline-strong active:scale-[0.98] active:shadow-none"
+          className="group relative isolate flex w-full items-center gap-2 rounded-[var(--corner-card)] px-3 py-2.5 text-[13px] font-medium text-ink shadow-[0_5px_16px_-6px] shadow-shade/16 transition-all duration-100 ease-out hover:shadow-shade/24 active:scale-[0.98] active:shadow-none"
+          style={{ "--sq-radius": "var(--corner-card)" } as CSSProperties}
         >
+          <Plate
+            face="var(--color-panel-raised)"
+            edge="var(--color-hairline)"
+            surfaceClassName="transition-colors group-hover:[--sq-edge:var(--color-hairline-strong)]"
+          />
           <Plus className="size-4 shrink-0 text-ink-faint" />
           New task
           <kbd className={cn(KBD, "ml-auto")}>N</kbd>
@@ -248,7 +256,11 @@ function FactOfTheDay({ fact }: { fact: HistoryFact }) {
 
   return (
     <section>
-      <div className="rounded-xl bg-black/3 px-3.5 py-3.5">
+      <div
+        className="relative isolate rounded-[var(--corner-card)] px-3.5 py-3.5"
+        style={{ "--sq-radius": "var(--corner-card)" } as CSSProperties}
+      >
+        <Plate face="color-mix(in oklab, var(--color-shade) 3%, transparent)" />
         <p className="flex items-center gap-1.5 text-[10px] font-medium text-ink-faint">
           <ScrollText className="size-3" />
           Historic fact
@@ -507,7 +519,11 @@ function BoardMenu({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-10 z-40 w-full animate-pop-in rounded-xl bg-panel-raised p-2 shadow-xl shadow-shade/15 ring-1 ring-hairline">
+        <div
+          className="absolute left-0 top-10 z-40 isolate w-full animate-pop-in rounded-[var(--corner-menu)] p-2 shadow-xl shadow-shade/15"
+          style={{ "--sq-radius": "var(--corner-menu)" } as CSSProperties}
+        >
+          <Plate face="var(--color-panel-raised)" edge="var(--color-hairline)" />
           <p className="px-2 py-1 text-[10px] uppercase tracking-wider text-ink-faint">
             Boards
           </p>
