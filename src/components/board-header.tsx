@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import { ListFilter, Plus, Search, X } from "lucide-react";
 import { type RefObject, useState } from "react";
 import { Button, IconButton, Input, KBD, useDismiss } from "@/components/ui";
 import { PRIORITIES, type Priority } from "@/db/schema";
@@ -49,57 +49,65 @@ export function BoardHeader({
     // Equal `1fr` side columns centre the search field independently of how
     // wide the controls on the right get, then the translate shifts it from the
     // header's centre to the viewport's — the header starts after the sidebar.
-    <header className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2.5 px-1.5 pb-3 pt-1">
+    <header className="relative z-30 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2.5 px-0 pb-3 pt-1">
       <span aria-hidden />
 
-      <div className="relative -translate-x-[calc((var(--sidebar-width)_-_var(--board-gutter))/2)]">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
-        <Input
-          ref={searchRef}
-          value={filters.query}
-          placeholder="Search tasks"
-          onChange={(e) =>
-            onFiltersChange({ ...filters, query: e.target.value })
-          }
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              onFiltersChange({ ...filters, query: "" });
-              e.currentTarget.blur();
+      {/* Search and Filter travel together, so the translate centres the pair on
+          the viewport rather than the field alone. */}
+      <div className="flex items-center gap-2.5 -translate-x-[calc((var(--sidebar-width)_-_var(--board-gutter))/2)]">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
+          <Input
+            ref={searchRef}
+            value={filters.query}
+            placeholder="Search tasks"
+            onChange={(e) =>
+              onFiltersChange({ ...filters, query: e.target.value })
             }
-          }}
-          className="h-8 w-[26rem] rounded-full bg-white/35 pl-10 pr-8 shadow-[0_1px_22px_-2px] shadow-shade/10 placeholder:text-ink-faint"
-        />
-        {filters.query ? (
-          <IconButton
-            label="Clear search"
-            onClick={() => onFiltersChange({ ...filters, query: "" })}
-            className="absolute right-1 top-1/2 size-7 -translate-y-1/2 rounded-full"
-          >
-            <X className="size-3.5" />
-          </IconButton>
-        ) : (
-          <kbd
-            className={cn(
-              KBD,
-              "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2",
-            )}
-          >
-            S
-          </kbd>
-        )}
-      </div>
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                onFiltersChange({ ...filters, query: "" });
+                e.currentTarget.blur();
+              }
+            }}
+            className="h-8 w-[26rem] rounded-full bg-white/35 pl-[38px] pr-8 shadow-[0_1px_22px_-2px] shadow-shade/10 placeholder:text-ink-faint"
+          />
+          {filters.query ? (
+            <IconButton
+              label="Clear search"
+              onClick={() => onFiltersChange({ ...filters, query: "" })}
+              className="absolute right-1 top-1/2 size-7 -translate-y-1/2 rounded-full"
+            >
+              <X className="size-3.5" />
+            </IconButton>
+          ) : (
+            <kbd
+              className={cn(
+                KBD,
+                "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2",
+              )}
+            >
+              S
+            </kbd>
+          )}
+        </div>
 
-      <div className="flex items-center gap-2.5 justify-self-end">
         <FilterMenu
           labels={labels}
           filters={filters}
           activeCount={activeFilterCount}
           onChange={onFiltersChange}
         />
+      </div>
 
-        <Button size="sm" variant="subtle" onClick={onAddColumn}>
+      <div className="flex items-center gap-2.5 justify-self-end">
+        <button
+          type="button"
+          onClick={onAddColumn}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink-faint transition-colors hover:bg-black/5 hover:text-ink-soft"
+        >
           <Plus className="size-3.5" /> Column
-        </Button>
+        </button>
       </div>
     </header>
   );
@@ -124,19 +132,27 @@ function FilterMenu({
 
   return (
     <div className="relative" ref={ref}>
-      <Button
-        size="sm"
-        variant={activeCount > 0 ? "primary" : "subtle"}
+      {/* Dressed as the search field rather than as a button, since the two now
+          read as one control. An active filter shows in the text and count
+          instead of a filled background, which would break the pairing. */}
+      <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-white/35 px-3.5 text-[13px] font-medium shadow-[0_1px_22px_-2px] shadow-shade/10 ring-1 ring-hairline transition-colors hover:bg-white/60",
+          activeCount > 0
+            ? "text-accent-ink"
+            : "text-ink-faint hover:text-ink-soft",
+        )}
       >
-        <SlidersHorizontal className="size-3.5" />
+        <ListFilter className="size-3.5" />
         Filter
         {activeCount > 0 && (
-          <span className="rounded bg-black/15 px-1 font-mono text-[10px]">
+          <span className="rounded bg-accent/12 px-1 font-mono text-[10px] text-accent-ink">
             {activeCount}
           </span>
         )}
-      </Button>
+      </button>
 
       {open && (
         <div className="absolute right-0 top-9 z-40 w-64 animate-pop-in space-y-3 rounded-xl bg-panel-raised p-3 shadow-xl shadow-shade/15 ring-1 ring-hairline">

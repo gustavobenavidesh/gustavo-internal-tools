@@ -636,7 +636,7 @@ export function BoardView({
           onAddColumn={addColumn}
         />
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] bg-surface shadow-lg shadow-shade/8 ring-1 ring-hairline">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[26px] bg-surface shadow-lg shadow-shade/8 ring-1 ring-hairline">
           <DndContext
             sensors={sensors}
             collisionDetection={collisionDetection}
