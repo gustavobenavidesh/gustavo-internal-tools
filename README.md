@@ -3,10 +3,16 @@
 A personal kanban for organising my tasks. Local-first, single user, no login.
 
 ```bash
+cp .env.example .env.local   # set DATABASE_FILE to a path outside the repo
 npm install
-npm run db:push   # creates data/kanban.db from src/db/schema.ts
-npm run dev       # http://localhost:3000
+npm run db:push              # creates that file from src/db/schema.ts
+npm run dev                  # http://localhost:3000
 ```
+
+`db:push` only works against a database that doesn't exist yet — see the note on
+migrations below — so run it once, before the first `dev`. Nothing else is
+required: no account, no server, no API keys. Slack sync is opt-in and off until
+`SLACK_USER_TOKEN` is set.
 
 ## What it does
 
@@ -92,5 +98,12 @@ were added that way.
 **`better-sqlite3` is pinned to v11.** The v13 prebuilt binary segfaults on
 Node 22.13 on this machine, including when built from source.
 
-The DB lives at `data/kanban.db` (gitignored) — override with `DATABASE_FILE`.
-Back it up by copying that file.
+**Die Grotesk won't be installed on your machine**, and shouldn't be — it's a
+licensed face, loaded with `local()` rather than shipped. Without it the app
+falls back to Geist and everything still works; the tone of the type is the only
+thing that changes.
+
+The DB path comes from `DATABASE_FILE` and belongs outside the repo, so deleting
+a checkout can't take your tickets with it. Back it up with `npm run db:backup`,
+which uses `VACUUM INTO` and then reopens the snapshot to verify it — a plain
+`cp` would miss the WAL, where the most recent writes still live.
