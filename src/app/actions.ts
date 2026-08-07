@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, inArray, max, min } from "drizzle-orm";
+import { and, asc, eq, inArray, max, min } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
@@ -16,6 +16,7 @@ import {
   taskLabels,
   tasks,
 } from "@/db/schema";
+import { listSlackPins, pinTitle } from "@/lib/slack";
 import { positionBefore, positionBetween } from "@/lib/utils";
 
 /**
@@ -477,4 +478,78 @@ export async function updateLabel(
 
 export async function deleteLabel(labelId: string) {
   db.delete(labels).where(eq(labels.id, labelId)).run();
+}
+
+// ---------------------------------------------------------------- slack
+
+/**
+ * Pulls 📌-reacted Slack messages onto the board as cards.
+ *
+ * Import target is the muted column — the one whose cards render dashed and
+ * unfilled — since that's the parking lot by definition, and picking it by flag
+ * rather than by the name "Backlog" survives a rename.
+ *
+ * Idempotent by `onConflictDoNothing` against the unique index on
+ * (source_type, source_ref): the poll re-sees the same reaction every few
+ * minutes and must not pile up duplicates. That also means a card deleted here
+ * stays deleted rather than being re-imported on the next tick, which is the
+ * behaviour you want — an unpinned-in-Slack message can't delete a card, so the
+ * board has to be the side that wins.
+ */
+export async function syncSlackPins(boardId: string) {
+  const pins = await listSlackPins();
+  if (pins.length === 0) return { created: 0, skipped: 0 };
+
+  const target = db
+    .select()
+    .from(columns)
+    .where(and(eq(columns.boardId, boardId), eq(columns.isMuted, true)))
+    .orderBy(asc(columns.position))
+    .get();
+
+  if (!target) {
+    throw new Error(
+      "No muted column to import into — mark one as 'Dim cards (parked)' first",
+    );
+  }
+
+  // Oldest first, so that a batch lands with the newest pin at the top of the
+  // column: each insert goes above the previous one.
+  const ordered = [...pins].reverse();
+
+  let created = 0;
+  db.transaction((tx) => {
+    for (const pin of ordered) {
+      const first = tx
+        .select({ value: min(tasks.position) })
+        .from(tasks)
+        .where(eq(tasks.columnId, target.id))
+        .get();
+
+      const inserted = tx
+        .insert(tasks)
+        .values({
+          boardId,
+          columnId: target.id,
+          title: pinTitle(pin.text),
+          // The full message is the card's notes, so a title trimmed to one
+          // line never loses anything.
+          description: pin.text,
+          position: positionBefore(first?.value),
+          sourceType: "slack",
+          sourceRef: pin.ref,
+          sourceUrl: pin.url,
+          sourceChannel: pin.channelName,
+          sourceAuthor: pin.authorName,
+        })
+        .onConflictDoNothing()
+        .returning()
+        .all();
+
+      if (inserted.length > 0) created += 1;
+    }
+  });
+
+  if (created > 0) revalidatePath("/", "layout");
+  return { created, skipped: pins.length - created };
 }

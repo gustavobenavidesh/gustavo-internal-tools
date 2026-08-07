@@ -6,6 +6,7 @@ import {
   real,
   sqliteTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
 /**
@@ -78,6 +79,10 @@ export const contexts = sqliteTable(
 export const PRIORITIES = ["none", "low", "medium", "high"] as const;
 export type Priority = (typeof PRIORITIES)[number];
 
+/** Where a card came from, when it wasn't typed on the board. */
+export const SOURCE_TYPES = ["slack"] as const;
+export type SourceType = (typeof SOURCE_TYPES)[number];
+
 export const tasks = sqliteTable(
   "tasks",
   {
@@ -99,10 +104,25 @@ export const tasks = sqliteTable(
     updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
+
+    /**
+     * Provenance, for cards this board didn't originate — all null for anything
+     * typed here. `sourceRef` is the upstream item's own id (a Slack message
+     * `ts`), which is what makes the importer idempotent: the unique index below
+     * lets the poll re-see the same reaction without creating a second card.
+     * SQLite treats NULLs as distinct in a unique index, so hand-made cards are
+     * unaffected no matter how many there are.
+     */
+    sourceType: text("source_type", { enum: SOURCE_TYPES }),
+    sourceRef: text("source_ref"),
+    sourceUrl: text("source_url"),
+    sourceChannel: text("source_channel"),
+    sourceAuthor: text("source_author"),
   },
   (t) => [
     index("tasks_column_idx").on(t.columnId),
     index("tasks_board_idx").on(t.boardId),
+    uniqueIndex("tasks_source_unique").on(t.sourceType, t.sourceRef),
   ],
 );
 

@@ -5,6 +5,7 @@ import type {
   Context,
   Label,
   Priority,
+  SourceType,
   Subtask,
 } from "@/db/schema";
 
@@ -25,6 +26,16 @@ export type ClientTask = {
   createdAt: number;
   labelIds: string[];
   subtasks: ClientSubtask[];
+  /** Set only on imported cards; null for anything typed on the board. */
+  source: ClientSource | null;
+};
+
+/** Where an imported card came from, enough to badge it and link back. */
+export type ClientSource = {
+  type: SourceType;
+  url: string;
+  channel: string | null;
+  author: string | null;
 };
 
 export type ClientColumn = {
@@ -64,6 +75,15 @@ export function toClientTask(task: TaskWithLabels): ClientTask {
     completedAt: task.completedAt?.getTime() ?? null,
     createdAt: task.createdAt.getTime(),
     labelIds: task.labelIds,
+    source:
+      task.sourceType && task.sourceUrl
+        ? {
+            type: task.sourceType,
+            url: task.sourceUrl,
+            channel: task.sourceChannel,
+            author: task.sourceAuthor,
+          }
+        : null,
     subtasks: task.subtasks.map((sub) => ({
       id: sub.id,
       title: sub.title,

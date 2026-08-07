@@ -1,0 +1,30 @@
+%YAML 1.2
+---
+# Paste this at api.slack.com/apps → Create New App → From an app manifest.
+#
+# It declares user scopes only. There are no bot scopes, no event subscriptions
+# and no request or redirect URLs, because nothing about this integration is
+# inbound: the board polls `reactions.list` with your own token rather than
+# having Slack push to it. That's what lets it work against localhost, and it's
+# why this app needs no hosting of any kind.
+#
+# `groups:read` and `im:read` are only there so private channels and DMs can be
+# named on the card. Drop them if you'll only ever pin in public channels.
+display_information:
+  name: Janban Pins
+  description: Turns pushpin reactions into cards on my kanban board
+  background_color: "#232325"
+
+oauth_config:
+  scopes:
+    user:
+      - reactions:read
+      - users:read
+      - channels:read
+      - groups:read
+      - im:read
+
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

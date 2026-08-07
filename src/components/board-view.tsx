@@ -54,6 +54,13 @@ import type {
   ClientTask,
 } from "@/lib/types";
 
+/**
+ * How often to look for new Slack pins. Slack rates `reactions.list` at Tier 2
+ * (20+/min), so this is three orders of magnitude inside the limit — the number
+ * is chosen for how soon a pin should appear, not to avoid throttling.
+ */
+const SLACK_POLL_MS = 3 * 60 * 1000;
+
 export function BoardView({
   data,
   boards,
@@ -104,6 +111,38 @@ export function BoardView({
     },
     [router],
   );
+
+  /**
+   * Slack pins, pulled in while the board is open.
+   *
+   * Polling rather than a webhook, because Slack can't reach localhost — see
+   * `src/lib/slack.ts`. It runs once on mount and then on an interval; the
+   * action is a no-op without `SLACK_USER_TOKEN`, so this costs nothing until
+   * the integration is configured. Only a non-zero `created` triggers a refresh,
+   * so a quiet poll doesn't re-render the board every few minutes.
+   *
+   * Failures are logged and swallowed: a dropped network or an expired token
+   * shouldn't put a toast in front of a board the user is working on.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    const pull = async () => {
+      try {
+        const { created } = await actions.syncSlackPins(boardId);
+        if (created > 0 && !cancelled) router.refresh();
+      } catch (cause) {
+        console.warn("Slack sync failed", cause);
+      }
+    };
+
+    pull();
+    const timer = setInterval(pull, SLACK_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [boardId, router]);
 
   const labelsById = useMemo(
     () => new Map(state.labels.map((l) => [l.id, l])),
@@ -358,6 +397,8 @@ export function BoardView({
           completedAt: null,
           createdAt: Date.now(),
           labelIds: [],
+          // Typed here, so it has no upstream to point back at.
+          source: null,
         },
       });
     }, "Couldn't add that task");
@@ -653,9 +694,15 @@ export function BoardView({
             } as CSSProperties
           }
         >
+          {/* The strong hairline rather than the plain one: `surface` and the
+              grained canvas behind it are only a few points apart, so at
+              `--color-hairline` this edge all but disappears — and it's the one
+              edge in the app with no shadow close enough underneath to imply it.
+              Task cards keep the lighter tone; they sit on `panel` with more
+              contrast to begin with. */}
           <Plate
             face="var(--color-surface)"
-            edge="var(--color-hairline)"
+            edge="var(--color-hairline-mid)"
             shadow="squircle-shadow-lg"
           />
           <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--corner-board)]">

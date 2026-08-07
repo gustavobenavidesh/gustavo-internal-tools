@@ -10,6 +10,7 @@ import { PRIORITIES, type Priority } from "@/db/schema";
 import { PRIORITY_STYLES, labelColor } from "@/lib/colors";
 import { contextIcon } from "@/lib/context-icons";
 import { PriorityBars } from "@/components/priority-bars";
+import { SlackMark } from "@/components/slack-mark";
 import { DUE_TONES, formatDue } from "@/lib/dates";
 import type { ClientContext, ClientLabel, ClientTask } from "@/lib/types";
 import { cn, noOrphans } from "@/lib/utils";
@@ -225,7 +226,7 @@ export function TaskCardBody({
         // which is also why this root must not be clipped: a clip path eats
         // outlines, including the focus ring.
         muted
-          ? "outline outline-2 outline-dashed -outline-offset-2 outline-hairline"
+          ? "outline outline-2 outline-dashed -outline-offset-2 outline-hairline-strong"
           : "shadow-[0_5px_16px_-6px] shadow-shade/16 hover:shadow-shade/24",
         overlay &&
           "rotate-3 scale-[1.03] cursor-grabbing shadow-2xl shadow-shade/30",
@@ -431,7 +432,7 @@ export function TaskCardBody({
         ))}
       </div>
 
-      {(due || task.description) && (
+      {(due || task.description || task.source) && (
         <div className="mt-3 flex items-center gap-2 text-[11px] text-ink-faint">
           {due && (
             <span
@@ -445,6 +446,32 @@ export function TaskCardBody({
           )}
           {task.description && (
             <AlignLeft className="size-3.5" aria-label="Has notes" />
+          )}
+
+          {/* Provenance, and a way back to it. Pointer events stop here for the
+              same reason the pills do: this is a link inside a draggable card
+              that also opens the dialog on click. */}
+          {task.source && (
+            <a
+              href={task.source.url}
+              target="_blank"
+              rel="noreferrer"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              title={[
+                "Open in Slack",
+                task.source.author && `pinned from ${task.source.author}`,
+                task.source.channel && `in #${task.source.channel}`,
+              ]
+                .filter(Boolean)
+                .join(" — ")}
+              className="ml-auto inline-flex min-w-0 items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-black/5 hover:text-ink-soft"
+            >
+              <SlackMark className="size-3 shrink-0" />
+              {task.source.channel && (
+                <span className="truncate">#{task.source.channel}</span>
+              )}
+            </a>
           )}
         </div>
       )}
