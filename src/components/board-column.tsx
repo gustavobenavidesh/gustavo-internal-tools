@@ -148,7 +148,11 @@ export function BoardColumn({
           featured one so the other columns don't gain a stacking context they
           have no use for. */}
       {column.isFocus && (
-        <Plate face="var(--color-canvas)" edge="var(--color-hairline)" grain />
+        <Plate
+          face="var(--color-canvas)"
+          edge="var(--color-hairline-mid)"
+          grain
+        />
       )}
       <header className="flex items-center gap-1 px-3 pb-2.5 pt-3">
         {/* The status glyph is also the drag handle — a grip alongside it was
@@ -248,7 +252,7 @@ export function BoardColumn({
             "--fade-bottom": moreBelow ? "40px" : "0px",
           } as CSSProperties
         }
-        className="fade-edges scrollbar-none min-h-0 flex-1 space-y-3.5 overflow-y-auto px-3 pb-3 pt-0.5"
+        className="fade-edges scrollbar-none min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pb-3 pt-0.5"
       >
         <SortableContext
           items={tasks.map((t) => t.id)}

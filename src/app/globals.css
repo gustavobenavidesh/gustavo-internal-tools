@@ -66,6 +66,12 @@
   --color-field: #eaeae6;
   --color-hairline: #eaeae7;
   --color-hairline-strong: #d8d8d4;
+  /* Between the two, for the app's largest surfaces — the board card and the
+     featured column. Their fill sits only a few points off the canvas behind
+     them, so `hairline` disappears there; but over that much length
+     `hairline-strong` reads as drawn on rather than as an edge. Same ~3-point
+     warm delta as its neighbours, so it stays in the palette's tone. */
+  --color-hairline-mid: #dededb;
 
   --color-ink: #232325;
   --color-ink-soft: #5f5f5e;
@@ -423,11 +429,20 @@ body::before {
   filter: var(--sq-shadow, none);
 }
 
+/**
+ * The board card's lift, and only its — the dialog takes `squircle-shadow-2xl`.
+ * It sits on the canvas across the full height of the window, so it reads much
+ * heavier than the same values would on a small element: there's simply more
+ * edge casting shadow. Hence tones well under what a card this size would
+ * normally take, and a slightly wider near layer to spread what's left.
+ */
 @utility squircle-shadow-lg {
   --sq-shadow: drop-shadow(
-      0 8px 12px color-mix(in oklab, var(--color-shade) 8%, transparent)
+      0 8px 14px color-mix(in oklab, var(--color-shade) 6%, transparent)
     )
-    drop-shadow(0 2px 4px color-mix(in oklab, var(--color-shade) 5%, transparent));
+    drop-shadow(
+      0 2px 4px color-mix(in oklab, var(--color-shade) 3.5%, transparent)
+    );
 }
 
 @utility squircle-shadow-2xl {
@@ -437,6 +452,28 @@ body::before {
     drop-shadow(
       0 4px 8px color-mix(in oklab, var(--color-shade) 10%, transparent)
     );
+}
+
+/**
+ * The lift under a control resting on the canvas — the search field and the
+ * filter pill, which read as one control and so share one shadow.
+ *
+ * Two layers: a near one that gives the edge definition, and a wide faint one
+ * for ambient depth. Neither reaches above the box, which is the constraint that
+ * shapes the numbers — a shadow spills upward by `blur / 2 + spread - offsetY`,
+ * and anything positive there lands in the strip where the page meets Safari's
+ * title bar and gets cut flat at the window edge. That cut is very visible now
+ * the bar is tinted to match the canvas.
+ *
+ * The previous single layer satisfied that but went too far the other way: at
+ * `-6px` spread the shadow rect shrinks well inside the pill, so the tone piles
+ * up against the bottom edge and reads as a hard ledge rather than a lift. Small
+ * negative spreads, larger blurs.
+ */
+@utility control-lift {
+  box-shadow:
+    0 6px 14px -4px color-mix(in oklab, var(--color-shade) 9%, transparent),
+    0 14px 28px -12px color-mix(in oklab, var(--color-shade) 7%, transparent);
 }
 
 @utility scrollbar-none {

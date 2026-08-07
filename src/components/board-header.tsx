@@ -1,9 +1,10 @@
 "use client";
 
-import { ListFilter, Plus, Search, X } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import {
   type CSSProperties, type RefObject, useState
 } from "react";
+import { FilterKnobs } from "@/components/filter-knobs";
 import { Button, IconButton, Input, KBD, Plate, useDismiss } from "@/components/ui";
 import { PRIORITIES, type Priority } from "@/db/schema";
 import { PRIORITY_STYLES, labelColor } from "@/lib/colors";
@@ -72,7 +73,7 @@ export function BoardHeader({
                 e.currentTarget.blur();
               }
             }}
-            className="h-8 w-[26rem] rounded-full bg-white/35 pl-[38px] pr-8 shadow-[0_1px_22px_-2px] shadow-shade/10 placeholder:text-ink-faint"
+            className="h-8 w-[26rem] rounded-full bg-white/35 pl-[38px] pr-8 control-lift transition-colors hover:bg-white/60 placeholder:text-ink-faint"
           />
           {filters.query ? (
             <IconButton
@@ -134,26 +135,30 @@ function FilterMenu({
 
   return (
     <div className="relative" ref={ref}>
-      {/* Dressed as the search field rather than as a button, since the two now
-          read as one control. An active filter shows in the text and count
-          instead of a filled background, which would break the pairing. */}
+      {/* No surface of its own: a glyph resting on the canvas beside the field,
+          rather than a second control competing with it. Which means the active
+          state has nowhere to live but the glyph — hence accent rather than a
+          count, with the number kept in the title so it isn't lost. The box is
+          the field's height so the two still sit on one baseline. */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        title={
+          activeCount > 0
+            ? `Filter — ${activeCount} active`
+            : "Filter"
+        }
+        aria-label={
+          activeCount > 0 ? `Filter, ${activeCount} active` : "Filter"
+        }
         className={cn(
-          "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-white/35 px-3.5 text-[13px] font-medium shadow-[0_1px_22px_-2px] shadow-shade/10 ring-1 ring-hairline transition-colors hover:bg-white/60",
+          "grid size-8 shrink-0 place-items-center rounded-full transition-colors",
           activeCount > 0
             ? "text-accent-ink"
-            : "text-ink-faint hover:text-ink-soft",
+            : "text-ink-ghost hover:text-ink-faint",
         )}
       >
-        <ListFilter className="size-3.5" />
-        Filter
-        {activeCount > 0 && (
-          <span className="rounded bg-accent/12 px-1 font-mono text-[10px] text-accent-ink">
-            {activeCount}
-          </span>
-        )}
+        <FilterKnobs className="size-[18px]" />
       </button>
 
       {open && (

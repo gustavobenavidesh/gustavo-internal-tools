@@ -87,7 +87,7 @@ const VARIANTS: Record<
   ghost: {
     root: "text-ink-soft hover:text-ink",
     surface:
-      "group-hover:[--sq-face:color-mix(in_oklab,var(--color-shade)_5%,transparent)]",
+      "group-hover:[--sq-face:color-mix(in_oklab,#000_5%,transparent)]",
   },
   danger: {
     root: "text-rose-700 hover:text-rose-800",

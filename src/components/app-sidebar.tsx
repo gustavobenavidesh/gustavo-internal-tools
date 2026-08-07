@@ -260,7 +260,11 @@ function FactOfTheDay({ fact }: { fact: HistoryFact }) {
         className="relative isolate rounded-[var(--corner-card)] px-3.5 py-3.5"
         style={{ "--sq-radius": "var(--corner-card)" } as CSSProperties}
       >
-        <Plate face="color-mix(in oklab, var(--color-shade) 3%, transparent)" />
+        {/* True black at low alpha, as it was before the plate — `--color-shade`
+            is #232325, which at these alphas reads perceptibly lighter. A step up
+            from the original 3%, since the smoothed corner gives the card less
+            edge to hold it apart from the sidebar. */}
+        <Plate face="color-mix(in oklab, #000 4%, transparent)" />
         <p className="flex items-center gap-1.5 text-[10px] font-medium text-ink-faint">
           <ScrollText className="size-3" />
           Historic fact

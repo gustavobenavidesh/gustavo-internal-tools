@@ -93,7 +93,12 @@ export function SidebarResizer() {
         if (e.key === "ArrowRight") nudge(16);
       }}
       title="Drag to resize — double-click to reset"
-      className="group relative z-20 -mr-1.5 w-3 shrink-0 cursor-col-resize"
+      // Negative margin on *both* sides, so the 12px grab strip straddles the
+      // seam and takes up no layout width at all. With `-mr-1.5` alone it still
+      // contributed 6px, which is why the board card sat further from the
+      // sidebar than the window edges do. The hover line lands in the same place
+      // either way: dead on the board card's left edge.
+      className="group relative z-20 -mx-1.5 w-3 shrink-0 cursor-col-resize"
     >
       <span
         aria-hidden
