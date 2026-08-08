@@ -61,9 +61,12 @@
   --color-surface: #fcfcfa;
   --color-panel: #f4f4f2;
   --color-panel-raised: #ffffff;
-  /* Inputs that sit on the canvas rather than on a card: recessed below it, so
-     they read as a well to type into rather than a raised panel. */
-  --color-field: #eaeae6;
+  /* The featured column, and the one surface that drops below the canvas. The
+     columns beside it have no fill at all, so the only thing that can carry the
+     emphasis is how far this one sits under the board card holding them — nine
+     points, about twice the step it had when it borrowed the canvas. Same
+     ~3-point warm delta as its neighbours, so it stays in the palette's tone. */
+  --color-panel-sunk: #ebebe8;
   --color-hairline: #eaeae7;
   --color-hairline-strong: #d8d8d4;
   /* Between the two, for the app's largest surfaces — the board card and the
@@ -116,10 +119,12 @@
   --grain-opacity: 0.22;
 
   /* How smooth the corners are — the one dial for the shape itself. 0.448 is a
-     plain circular arc, 0.091 is a full squircle, and this sits near the middle,
-     around the 60% that gets quoted for Apple's corners. The `squircle` utility
-     has the scale and how it's derived. */
-  --corner-smooth: 0.19;
+     plain circular arc and 0.091 is a full squircle, so this sits between the
+     two but well over towards the circle: enough shape to read as continuous,
+     short of the ~60% quoted for Apple's own corners, which was more than this
+     board wants at these radii. The `squircle` utility has the scale, how it's
+     derived, and what a given step is worth in pixels. */
+  --corner-smooth: 0.3;
 
   /* Corner radii, in one place because the squircle needs each of them twice:
      once as `--sq-radius` for the clip path, and once as a `border-radius` on the
@@ -314,10 +319,17 @@ body::before {
  * in from the corner along the diagonal — gives the exact fraction per exponent:
  *
  *   0.448  exponent 2, a plain circular arc — Figma's 0% smoothing
- *   0.19   exponent ~3.2 — about Figma's 60%, which is the figure quoted for
- *          Apple's own corners, and what this is set to
+ *   0.3    exponent ~2.6 — around Figma's 35%, and what this is set to
+ *   0.19   exponent ~3.2 — about Figma's 60%, the figure quoted for Apple's own
+ *          corners; read as overdone at these sizes
  *   0.091  exponent 4, the full squircle — `corner-shape: squircle`, Figma's 100%
  *   0.012  exponent 5, close to square
+ *
+ * Lower is smoother. Be warned how little of this the eye gets: the curve's
+ * midpoint sits r·(3s+1)/8 in from the box corner, so the *entire* range from
+ * circle to full squircle moves the outline by 2.7px on a 20px radius. A change
+ * of 0.01 is a tenth of a pixel there — invisible. Steps of 0.05 are the smallest
+ * worth making, and worth checking against the radius they'll be seen at.
  *
  * The mapping from Figma's percentage onto an exponent is approximate: Figma
  * smooths with an arc plus two Bézier segments rather than a superellipse, so
@@ -452,28 +464,6 @@ body::before {
     drop-shadow(
       0 4px 8px color-mix(in oklab, var(--color-shade) 10%, transparent)
     );
-}
-
-/**
- * The lift under a control resting on the canvas — the search field and the
- * filter pill, which read as one control and so share one shadow.
- *
- * Two layers: a near one that gives the edge definition, and a wide faint one
- * for ambient depth. Neither reaches above the box, which is the constraint that
- * shapes the numbers — a shadow spills upward by `blur / 2 + spread - offsetY`,
- * and anything positive there lands in the strip where the page meets Safari's
- * title bar and gets cut flat at the window edge. That cut is very visible now
- * the bar is tinted to match the canvas.
- *
- * The previous single layer satisfied that but went too far the other way: at
- * `-6px` spread the shadow rect shrinks well inside the pill, so the tone piles
- * up against the bottom edge and reads as a hard ledge rather than a lift. Small
- * negative spreads, larger blurs.
- */
-@utility control-lift {
-  box-shadow:
-    0 6px 14px -4px color-mix(in oklab, var(--color-shade) 9%, transparent),
-    0 14px 28px -12px color-mix(in oklab, var(--color-shade) 7%, transparent);
 }
 
 @utility scrollbar-none {

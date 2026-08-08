@@ -29,6 +29,19 @@ export function positionBefore(first?: number | null): number {
 }
 
 /**
+ * A card title cut down to fit in a sentence — the toast quotes two of them at
+ * once, so each is clipped rather than the line being allowed to run. Cut in code
+ * rather than with `text-overflow`, which would truncate the whole sentence and
+ * take the second title with it.
+ */
+export function clipTitle(title: string, max = 26) {
+  const trimmed = title.trim();
+  return trimmed.length > max
+    ? `${trimmed.slice(0, max - 1).trimEnd()}…`
+    : trimmed;
+}
+
+/**
  * Ties the last two words together with a non-breaking space so a title can
  * never wrap to a lone word. `text-wrap: pretty` does this natively but only in
  * recent browsers, and only as a preference — this is deterministic.

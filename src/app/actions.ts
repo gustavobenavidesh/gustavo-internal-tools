@@ -330,10 +330,16 @@ export async function moveTask(
   return { position, completedAt: isDone ? Date.now() : null };
 }
 
-export async function archiveTask(taskId: string) {
+/**
+ * Off the board, still in the database. Takes a set rather than one id because
+ * clearing a done column is the same write as archiving a single card, and undo
+ * has to reverse either in one step.
+ */
+export async function archiveTasks(taskIds: string[]) {
+  if (taskIds.length === 0) return;
   db.update(tasks)
     .set({ archivedAt: new Date() })
-    .where(eq(tasks.id, taskId))
+    .where(inArray(tasks.id, taskIds))
     .run();
 }
 
@@ -341,15 +347,119 @@ export async function deleteTask(taskId: string) {
   db.delete(tasks).where(eq(tasks.id, taskId)).run();
 }
 
-/** Clears every finished task out of a done column in one go. */
-export async function archiveColumnTasks(columnId: string) {
-  const archived = db
-    .update(tasks)
-    .set({ archivedAt: new Date() })
-    .where(eq(tasks.columnId, columnId))
-    .returning({ id: tasks.id })
-    .all();
-  return archived.map((t) => t.id);
+/**
+ * Puts archived cards back on the board — the inverse of `archiveTasks`, and so
+ * what ⌘Z calls to undo an archive.
+ *
+ * Archiving leaves `columnId` and `position` alone, so there's nothing to
+ * restore but the card's presence.
+ */
+export async function unarchiveTasks(taskIds: string[]) {
+  if (taskIds.length === 0) return;
+  db.update(tasks)
+    .set({ archivedAt: null, updatedAt: new Date() })
+    .where(inArray(tasks.id, taskIds))
+    .run();
+}
+
+/**
+ * Folds one card into another: the dropped card becomes a checklist item on the
+ * card it landed in, and leaves the board.
+ *
+ * Archived rather than deleted, because a checklist item is only a title and a
+ * tick — the notes, labels, due date and Slack provenance have nowhere to go, so
+ * the row stays in the database where a mis-drop can still be recovered from.
+ * The card's own checklist comes along, in order, below the item it becomes.
+ */
+export async function nestTaskAsSubtask(taskId: string, parentTaskId: string) {
+  if (taskId === parentTaskId) throw new Error("A card can't nest into itself");
+
+  return db.transaction((tx) => {
+    const task = tx.select().from(tasks).where(eq(tasks.id, taskId)).get();
+    const parent = tx
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(eq(tasks.id, parentTaskId))
+      .get();
+    if (!task || !parent) throw new Error("That card no longer exists");
+
+    const last = tx
+      .select({ value: max(subtasks.position) })
+      .from(subtasks)
+      .where(eq(subtasks.taskId, parentTaskId))
+      .get();
+    let position = (last?.value ?? 0) + 1000;
+
+    const [created] = tx
+      .insert(subtasks)
+      .values({
+        taskId: parentTaskId,
+        title: task.title,
+        // A finished card folds in already ticked, rather than reopening.
+        done: task.completedAt !== null,
+        position,
+      })
+      .returning()
+      .all();
+
+    // Read after the insert above, so the new item isn't one of the carried
+    // ones — it belongs to the parent, these still belong to the dropped card.
+    const carried = tx
+      .select()
+      .from(subtasks)
+      .where(eq(subtasks.taskId, taskId))
+      .orderBy(asc(subtasks.position))
+      .all();
+
+    for (const sub of carried) {
+      position += 1000;
+      tx.update(subtasks)
+        .set({ taskId: parentTaskId, position })
+        .where(eq(subtasks.id, sub.id))
+        .run();
+    }
+
+    tx.update(tasks)
+      .set({ archivedAt: new Date(), updatedAt: new Date() })
+      .where(eq(tasks.id, taskId))
+      .run();
+
+    return [created, ...carried].map((sub) => ({
+      id: sub.id,
+      title: sub.title,
+      done: sub.done,
+    }));
+  });
+}
+
+/**
+ * The inverse of `nestTaskAsSubtask`: throws away the checklist item the card
+ * became, hands the card its own checklist back, and returns it to the board.
+ *
+ * `carriedIds` are the items that came along on the way in, in order — their
+ * positions inside the card were overwritten then, so they're renumbered back
+ * into that same order here rather than recovered.
+ */
+export async function unnestTask(
+  taskId: string,
+  subtaskId: string,
+  carriedIds: string[],
+) {
+  db.transaction((tx) => {
+    tx.delete(subtasks).where(eq(subtasks.id, subtaskId)).run();
+
+    carriedIds.forEach((id, i) => {
+      tx.update(subtasks)
+        .set({ taskId, position: (i + 1) * 1000 })
+        .where(eq(subtasks.id, id))
+        .run();
+    });
+
+    tx.update(tasks)
+      .set({ archivedAt: null, updatedAt: new Date() })
+      .where(eq(tasks.id, taskId))
+      .run();
+  });
 }
 
 // ---------------------------------------------------------------- subtasks

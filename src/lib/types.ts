@@ -55,6 +55,21 @@ export type ClientSubtask = Pick<Subtask, "id" | "title" | "done">;
 
 export type ClientBoard = Pick<Board, "id" | "name">;
 
+/**
+ * What releasing the drag right now would do, and which card it would do it to.
+ *
+ * Drives both halves of the feedback — the bar marking an insertion slot, and the
+ * highlight on a card about to swallow one — and also which way the rest of the
+ * column moves to make room (`roomFor` in `src/lib/drag.ts`), since the card this
+ * names is the one that has to stay put to be aimed at.
+ */
+export type DropHint = {
+  targetId: string;
+  where: "above" | "below" | "into";
+  /** The dragged card's title, drawn in place as the item it would become. */
+  title: string;
+};
+
 export type ClientBoardData = {
   board: ClientBoard;
   columns: ClientColumn[];

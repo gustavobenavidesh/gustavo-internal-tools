@@ -163,9 +163,16 @@ export function AppSidebar({
           type="button"
           onClick={onNewTask}
           title="New task — press N, or ⌥N from a field"
-          // Card-coloured on purpose: it's the thing that makes cards.
-          className="group relative isolate flex w-full items-center gap-2 rounded-[var(--corner-card)] px-3 py-2.5 text-[13px] font-medium text-ink shadow-[0_5px_16px_-6px] shadow-shade/16 transition-all duration-100 ease-out hover:shadow-shade/24 active:scale-[0.98] active:shadow-none"
-          style={{ "--sq-radius": "var(--corner-card)" } as CSSProperties}
+          // Card-coloured on purpose: it's the thing that makes cards — but two
+          // points tighter than one, since it's a control and shorter than any
+          // card. Kept as an offset from the card radius rather than a number of
+          // its own, so it still follows if that token moves. The two have to
+          // agree: one clips the shape, the other rounds the box casting the
+          // shadow.
+          className="group relative isolate flex w-full items-center gap-2 rounded-[calc(var(--corner-card)_-_2px)] px-3 py-2.5 text-[13px] font-medium text-ink shadow-[0_5px_16px_-6px] shadow-shade/16 transition-all duration-100 ease-out hover:shadow-shade/24 active:scale-[0.98] active:shadow-none"
+          style={
+            { "--sq-radius": "calc(var(--corner-card) - 2px)" } as CSSProperties
+          }
         >
           <Plate
             face="var(--color-panel-raised)"

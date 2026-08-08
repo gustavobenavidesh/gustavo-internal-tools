@@ -2,8 +2,8 @@
 
 import {
   SortableContext,
+  type SortingStrategy,
   useSortable,
-  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -30,10 +30,38 @@ import type {
   ClientContext,
   ClientLabel,
   ClientTask,
+  DropHint,
 } from "@/lib/types";
 import { TargetRings } from "@/components/target-rings";
 import { columnIcon, columnIconTone } from "@/lib/column-icons";
+import { type Room, roomFor, roomInColumn } from "@/lib/drag";
 import { cn } from "@/lib/utils";
+
+/**
+ * The vertical rhythm of the card list, which is also how far a card has to move
+ * to open a slot: its own height plus one gap. Kept next to the `space-y-3` on
+ * the list below, because the two have to agree.
+ */
+const CARD_GAP = 12;
+
+/**
+ * Cards make room for the one being dragged, but never the one it's aimed at —
+ * `roomFor` explains why, and does the arithmetic. This turns its answer into the
+ * transform dnd-kit wants, and stands in for `verticalListSortingStrategy`.
+ */
+function makeRoom(room: Room | null): SortingStrategy {
+  return ({ index, activeNodeRect }) => {
+    if (!room || !activeNodeRect) return null;
+    const step = roomFor(index, room.hole, room.gap);
+    if (step === 0) return null;
+    return {
+      x: 0,
+      y: step * (activeNodeRect.height + CARD_GAP),
+      scaleX: 1,
+      scaleY: 1,
+    };
+  };
+}
 
 type Props = {
   column: ClientColumn;
@@ -42,6 +70,10 @@ type Props = {
   contexts: ClientContext[];
   /** Total before filtering, so a filtered column still shows what it holds. */
   totalCount: number;
+  /** What a drop would do right now, drawn on whichever card it names. */
+  dropHint: DropHint | null;
+  /** The card being dragged anywhere on the board, so this column can make room. */
+  draggingTaskId: string | null;
   /** Controlled so the `n` shortcut can open the first column's composer. */
   composing: boolean;
   onComposingChange: (open: boolean) => void;
@@ -65,6 +97,8 @@ export function BoardColumn({
   labels,
   contexts,
   totalCount,
+  dropHint,
+  draggingTaskId,
   composing,
   onComposingChange,
   onOpenTask,
@@ -121,9 +155,24 @@ export function BoardColumn({
   const overLimit = column.wipLimit !== null && totalCount > column.wipLimit;
   const labelsById = new Map(labels.map((l) => [l.id, l]));
 
+  // Measured against the rendered list, so a filtered column makes room as it
+  // looks rather than as the unfiltered board would.
+  const ids = tasks.map((t) => t.id);
+  const room = roomInColumn({
+    order: ids,
+    draggingId: draggingTaskId,
+    target: dropHint
+      ? { id: dropHint.targetId, where: dropHint.where }
+      : null,
+  });
+
   return (
     <section
       ref={setNodeRef}
+      // What `n` hit-tests against to open its composer in the column under the
+      // pointer. On the section rather than the card list, so the header and the
+      // padding around the cards count as this column too.
+      data-column={column.id}
       style={
         {
           transform: CSS.Translate.toString(transform),
@@ -149,7 +198,7 @@ export function BoardColumn({
           have no use for. */}
       {column.isFocus && (
         <Plate
-          face="var(--color-canvas)"
+          face="var(--color-panel-sunk)"
           edge="var(--color-hairline-mid)"
           grain
         />
@@ -254,9 +303,19 @@ export function BoardColumn({
         }
         className="fade-edges scrollbar-none min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pb-3 pt-0.5"
       >
+        {/* The field opens at the top because that's where the card lands —
+            `createTask` puts a new one above the rest. Its button stays at the
+            bottom, out of the way of the cards it would otherwise push down. */}
+        {composing && (
+          <Composer
+            onCancel={() => onComposingChange(false)}
+            onSubmit={(title) => onQuickAdd(column.id, title)}
+          />
+        )}
+
         <SortableContext
-          items={tasks.map((t) => t.id)}
-          strategy={verticalListSortingStrategy}
+          items={ids}
+          strategy={makeRoom(room)}
         >
           {tasks.map((task) => (
             <TaskCard
@@ -267,6 +326,7 @@ export function BoardColumn({
                 .filter((l): l is ClientLabel => Boolean(l))}
               contexts={contexts}
               muted={column.isMuted}
+              drop={dropHint?.targetId === task.id ? dropHint : null}
               onOpen={onOpenTask}
               onSetContexts={onSetTaskContexts}
               onSetPriority={onSetTaskPriority}
@@ -283,12 +343,7 @@ export function BoardColumn({
           </p>
         )}
 
-        {composing ? (
-          <Composer
-            onCancel={() => onComposingChange(false)}
-            onSubmit={(title) => onQuickAdd(column.id, title)}
-          />
-        ) : (
+        {!composing && (
           <button
             type="button"
             onClick={() => onComposingChange(true)}
@@ -368,7 +423,10 @@ function Composer({
   return (
     <div
       ref={wrapperRef}
-      className="relative isolate rounded-[var(--corner-card)] p-2.5"
+      // The card's own padding, not a control's: this is a task card being
+      // written, so the text should start where the title of the card it becomes
+      // will start. `p-4` here and on `TaskCardBody` are the same inset.
+      className="relative isolate rounded-[var(--corner-card)] p-4"
       style={{ "--sq-radius": "var(--corner-card)" } as CSSProperties}
     >
       <Plate

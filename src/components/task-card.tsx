@@ -12,7 +12,12 @@ import { contextIcon } from "@/lib/context-icons";
 import { PriorityBars } from "@/components/priority-bars";
 import { SlackMark } from "@/components/slack-mark";
 import { DUE_TONES, formatDue } from "@/lib/dates";
-import type { ClientContext, ClientLabel, ClientTask } from "@/lib/types";
+import type {
+  ClientContext,
+  ClientLabel,
+  ClientTask,
+  DropHint,
+} from "@/lib/types";
 import { cn, noOrphans } from "@/lib/utils";
 
 /**
@@ -33,6 +38,12 @@ type Props = {
   contexts: ClientContext[];
   /** Cards in a muted column render as parked: flat, dashed, barely filled. */
   muted?: boolean;
+  /**
+   * Set while a drag is aimed at this card: a bar along the top or bottom edge
+   * for the slot the card would be inserted into, or the whole card lit up with
+   * the checklist item it would gain. Null on every other card.
+   */
+  drop?: DropHint | null;
   onOpen: (taskId: string) => void;
   onSetContexts: (taskId: string, contextIds: string[]) => void;
   onSetPriority: (taskId: string, priority: Priority) => void;
@@ -44,6 +55,7 @@ export function TaskCard({
   labels,
   contexts,
   muted,
+  drop,
   onOpen,
   onSetContexts,
   onSetPriority,
@@ -69,7 +81,10 @@ export function TaskCard({
    * puts it somewhere else, animate from the old position to the new one.
    *
    * Offsets, not `getBoundingClientRect`: offsets are layout-relative, so
-   * scrolling the column doesn't look like movement.
+   * scrolling the column doesn't look like movement. The drag transform is added
+   * back in, so what's remembered is where the card *looked* — a card that gives
+   * up a transform at the same moment the layout absorbs it hasn't moved at all,
+   * and animating the layout half of that on its own is a visible jump.
    */
   const wrapper = useRef<HTMLDivElement | null>(null);
   const lastBox = useRef<{ top: number; left: number } | null>(null);
@@ -78,12 +93,16 @@ export function TaskCard({
     const el = wrapper.current;
     if (!el) return;
 
-    const box = { top: el.offsetTop, left: el.offsetLeft };
+    const box = {
+      top: el.offsetTop + (transform?.y ?? 0),
+      left: el.offsetLeft + (transform?.x ?? 0),
+    };
     const previous = lastBox.current;
     lastBox.current = box;
 
-    // The dragged card is already following the pointer; don't fight it.
-    if (!previous || isDragging) return;
+    // The dragged card is already following the pointer; don't fight it. Nor
+    // dnd-kit, which animates the transform itself whenever it hands one over.
+    if (!previous || isDragging || transition) return;
 
     const dx = previous.left - box.left;
     const dy = previous.top - box.top;
@@ -111,6 +130,7 @@ export function TaskCard({
         labels={labels}
         contexts={contexts}
         muted={muted}
+        drop={drop}
         onSetContexts={onSetContexts}
         onSetPriority={onSetPriority}
         onToggleSubtask={onToggleSubtask}
@@ -132,6 +152,7 @@ export function TaskCardBody({
   labels,
   contexts,
   muted,
+  drop,
   overlay,
   className,
   onSetContexts,
@@ -143,6 +164,7 @@ export function TaskCardBody({
   labels: ClientLabel[];
   contexts: ClientContext[];
   muted?: boolean;
+  drop?: DropHint | null;
   overlay?: boolean;
   onSetContexts?: (taskId: string, contextIds: string[]) => void;
   onSetPriority?: (taskId: string, priority: Priority) => void;
@@ -152,6 +174,8 @@ export function TaskCardBody({
   const priority = PRIORITY_STYLES[task.priority];
   const done = task.completedAt !== null;
   const assigned = contexts.filter((c) => task.contextIds.includes(c.id));
+  /** The fold-in is the only drop state that changes the card itself. */
+  const swallowing = drop?.where === "into";
 
   const toggleContext = (contextId: string) =>
     onSetContexts?.(
@@ -213,7 +237,11 @@ export function TaskCardBody({
   return (
     <div
       className={cn(
-        "group relative isolate w-full cursor-grab rounded-[var(--corner-card)] text-left transition-[box-shadow,transform]",
+        // Opacity is in the transition list for the overlay's sake: it dims as it
+        // comes to rest over a card it would fold into, and the flight it hands
+        // off to starts from that exact value — a snap here would be the first
+        // frame of the animation.
+        "group relative isolate w-full cursor-grab rounded-[var(--corner-card)] text-left transition-[box-shadow,transform,opacity]",
         // The shadow stays a box-shadow on this root, which is deliberately left
         // unclipped. Moving it onto the plate would mean a `filter` — and so a
         // repaint layer — per card during a drag, and at a 12px radius the gap
@@ -226,10 +254,17 @@ export function TaskCardBody({
         // which is also why this root must not be clipped: a clip path eats
         // outlines, including the focus ring.
         muted
-          ? "outline outline-2 outline-dashed -outline-offset-2 outline-hairline-strong"
+          ? cn(
+              "outline outline-2 outline-dashed -outline-offset-2",
+              // A parked card has no plate to tint, so its dash is the only
+              // thing that can say it's the one about to swallow the drop.
+              swallowing ? "outline-accent" : "outline-hairline-strong",
+            )
           : "shadow-[0_5px_16px_-6px] shadow-shade/16 hover:shadow-shade/24",
         overlay &&
           "rotate-3 scale-[1.03] cursor-grabbing shadow-2xl shadow-shade/30",
+        // Lifts towards the card being dropped in, the way a folder opens.
+        swallowing && "scale-[1.02]",
         className,
       )}
       style={{ "--sq-radius": "var(--corner-card)" } as CSSProperties}
@@ -243,15 +278,32 @@ export function TaskCardBody({
           <div
             className={cn(
               "squircle-surface size-full transition-colors",
-              overlay
-                ? "[--sq-edge:color-mix(in_oklab,var(--color-accent)_50%,transparent)] [--sq-face:var(--color-panel-raised)]"
-                : done
-                  ? "[--sq-edge:color-mix(in_oklab,var(--color-emerald-600)_15%,transparent)] [--sq-face:var(--color-done)] group-hover:[--sq-edge:color-mix(in_oklab,var(--color-emerald-600)_25%,transparent)]"
-                  : "[--sq-edge:var(--color-hairline)] [--sq-face:var(--color-panel-raised)] group-hover:[--sq-edge:var(--color-hairline-strong)]",
+              swallowing
+                ? "[--sq-edge:var(--color-accent)] [--sq-face:color-mix(in_oklab,var(--color-accent)_7%,var(--color-panel-raised))]"
+                : overlay
+                  ? "[--sq-edge:color-mix(in_oklab,var(--color-accent)_50%,transparent)] [--sq-face:var(--color-panel-raised)]"
+                  : done
+                    ? "[--sq-edge:color-mix(in_oklab,var(--color-emerald-600)_15%,transparent)] [--sq-face:var(--color-done)] group-hover:[--sq-edge:color-mix(in_oklab,var(--color-emerald-600)_25%,transparent)]"
+                    : "[--sq-edge:var(--color-hairline)] [--sq-face:var(--color-panel-raised)] group-hover:[--sq-edge:var(--color-hairline-strong)]",
             )}
           />
         </div>
       )}
+      {/* The insertion slot, drawn as a bar along whichever edge the card would
+          land on. Inside the card's own box on purpose: a line *between* cards
+          would need layout space, and shifting the list is the one thing a drag
+          must not do here. Sat above the content so it isn't lost against a
+          title, and out of the flow so it costs no height. */}
+      {drop && !swallowing && (
+        <div
+          aria-hidden
+          className={cn(
+            "absolute inset-x-2 z-10 h-[3px] rounded-full bg-accent shadow-[0_0_0_3px] shadow-accent/20",
+            drop.where === "above" ? "-top-[2px]" : "-bottom-[2px]",
+          )}
+        />
+      )}
+
       {/* Content is clipped to the same shape, standing in for the
           `overflow-hidden` this used to carry on the root. */}
       <div className="squircle p-4">
@@ -277,7 +329,7 @@ export function TaskCardBody({
         )}
       </div>
 
-      {task.subtasks.length > 0 && (
+      {(task.subtasks.length > 0 || swallowing) && (
         <ul className="mt-3.5 space-y-1">
           {task.subtasks.map((sub) => (
             <li key={sub.id}>
@@ -315,6 +367,15 @@ export function TaskCardBody({
               </button>
             </li>
           ))}
+
+          {/* Where the hovering card would land, drawn as the item it's about
+              to become — so the gesture explains itself before the drop. */}
+          {swallowing && (
+            <li className="flex animate-pop-in items-start gap-1.5 text-[12px] leading-snug">
+              <span className="mt-px size-3.5 shrink-0 rounded-[4px] outline outline-1 outline-dashed -outline-offset-1 outline-accent" />
+              <span className="truncate text-accent-ink">{drop.title}</span>
+            </li>
+          )}
         </ul>
       )}
 

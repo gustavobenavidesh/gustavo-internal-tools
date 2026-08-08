@@ -25,6 +25,7 @@ export type BoardAction =
   | { type: "reset"; data: ClientBoardData }
   | { type: "board/rename"; name: string }
   | { type: "task/add"; task: ClientTask }
+  | { type: "task/insert"; task: ClientTask; index: number }
   | { type: "task/patch"; taskId: string; patch: Partial<ClientTask> }
   | { type: "task/remove"; taskIds: string[] }
   | { type: "task/move"; taskId: string; toColumnId: string; toIndex: number }
@@ -85,6 +86,26 @@ export function boardReducer(
           ],
         },
       };
+
+    /**
+     * Puts a card back at a known place in its column, which is what undoing an
+     * archive or a fold-in needs — `task/add` always lands at the top, matching
+     * where a freshly created card goes.
+     */
+    case "task/insert": {
+      const column = action.task.columnId;
+      // Its column can have been deleted since, taking the card with it.
+      if (!state.taskOrder[column]) return state;
+
+      const order = state.taskOrder[column].filter((id) => id !== action.task.id);
+      const index = Math.max(0, Math.min(action.index, order.length));
+      order.splice(index, 0, action.task.id);
+      return {
+        ...state,
+        tasks: { ...state.tasks, [action.task.id]: action.task },
+        taskOrder: { ...state.taskOrder, [column]: order },
+      };
+    }
 
     case "task/patch": {
       const task = state.tasks[action.taskId];

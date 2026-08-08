@@ -346,9 +346,56 @@ export function AnchoredMenu({
   );
 }
 
-/** Keyboard hints — shared so the search field and the New task button match. */
+/**
+ * The one thing that speaks from the bottom of the screen. `alert` is for a write
+ * the server refused, `status` for the quieter running commentary — a card folded
+ * into another, a ⌘Z — which shouldn't interrupt a screen reader mid-sentence.
+ */
+export function Toast({
+  tone = "notice",
+  children,
+}: {
+  tone?: "notice" | "error";
+  children: ReactNode;
+}) {
+  const error = tone === "error";
+
+  return (
+    <div
+      role={error ? "alert" : "status"}
+      className={cn(
+        // Above the modal's own z-50: `Modal` portals to the body, so at equal
+        // depth it would paint over this — and "close the card first to undo" is
+        // a message you only see while a card is open.
+        "fixed bottom-4 left-1/2 isolate z-[60] -translate-x-1/2 animate-pop-in rounded-[var(--corner-chip)] text-xs shadow-lg shadow-shade/8",
+        error ? "text-rose-900" : "text-ink-soft",
+      )}
+      style={{ "--sq-radius": "var(--corner-chip)" } as CSSProperties}
+    >
+      <Plate
+        face={error ? "var(--color-rose-50)" : "var(--color-panel-raised)"}
+        edge={
+          error
+            ? "color-mix(in oklab, var(--color-rose-600) 25%, transparent)"
+            : "var(--color-hairline-strong)"
+        }
+      />
+      <div className="squircle flex items-center gap-2 px-3 py-2">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Keyboard hints — shared so the search field and the New task button match.
+ *
+ * Opaque, not a black tint. A tint composes with whatever is behind it, so the
+ * same class rendered a light chip on the white button and an almost invisible
+ * dark one inside the search pill: identical code, different key. These two are
+ * what `black/5` and its ring already computed to on white, to a couple of
+ * points, so nothing moves where it was already right.
+ */
 export const KBD =
-  "rounded-md bg-black/5 px-1.5 py-1 text-[10px] font-medium leading-none text-ink-faint ring-1 ring-inset ring-black/5";
+  "rounded-md bg-panel px-1.5 py-1 text-[10px] font-medium leading-none text-ink-faint ring-1 ring-inset ring-hairline";
 
 export const MENU_ITEM =
   "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink transition-colors hover:bg-black/5";

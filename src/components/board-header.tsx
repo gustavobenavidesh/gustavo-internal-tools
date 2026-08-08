@@ -59,7 +59,25 @@ export function BoardHeader({
           the viewport rather than the field alone. */}
       <div className="flex items-center gap-2.5 -translate-x-[calc((var(--sidebar-width)_-_var(--board-gutter))/2)]">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
+          {/* Icon and text are a step down from the app's usual sizes. The pill
+              is the widest thing in the toolbar and can't be much narrower and
+              still be a search field, so what makes it recede is the type inside
+              it rather than the box. */}
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-3.5 -translate-y-1/2 text-white" />
+          {/* The one control in the app that cuts *into* its background rather
+              than sitting on it: everywhere else an input is `panel-raised`, but
+              those are inside a panel, and this one is out on the bare canvas
+              with nothing behind it to be raised above. A well needs no edge —
+              the fill carries it, so the inherited hairline comes off and the
+              focus ring is the only one left.
+
+              A mid grey, and a deliberately soft one: the icon, the placeholder
+              and what you type are plain white on it, which comes to 2.6:1 —
+              under what you'd ship to other people, and chosen anyway, because
+              this is a single-user board and the pill wanted to stay quiet. The
+              contrast follows the fill, so lightening it further means the white
+              has to give way to ink instead. It's the app's one inverted surface,
+              so everything inside is keyed off white rather than ink. */}
           <Input
             ref={searchRef}
             value={filters.query}
@@ -73,17 +91,25 @@ export function BoardHeader({
                 e.currentTarget.blur();
               }
             }}
-            className="h-8 w-[26rem] rounded-full bg-white/35 pl-[38px] pr-8 control-lift transition-colors hover:bg-white/60 placeholder:text-ink-faint"
+            // Hover deepens, which on this one *raises* contrast against the
+            // white inside it — the opposite of what it did while the fill was
+            // light, and the reason the two numbers swapped places.
+            className="h-8 w-[22rem] rounded-full bg-shade/[0.4] pl-[34px] pr-8 text-[13px] text-white ring-transparent transition-colors hover:bg-shade/[0.5] hover:ring-transparent placeholder:text-white"
           />
           {filters.query ? (
             <IconButton
               label="Clear search"
               onClick={() => onFiltersChange({ ...filters, query: "" })}
-              className="absolute right-1 top-1/2 size-7 -translate-y-1/2 rounded-full"
+              // Takes the key cap's place, so it lights the same way rather than
+              // darkening into the well the way the shared button does.
+              className="absolute right-1 top-1/2 size-7 -translate-y-1/2 rounded-full text-white hover:bg-white/20 hover:text-white"
             >
               <X className="size-3.5" />
             </IconButton>
           ) : (
+            /* The shared cap, untouched — the same chip as the one on the New
+               task button, which is the point: two keys for two shortcuts should
+               look like the same kind of thing wherever they sit. */
             <kbd
               className={cn(
                 KBD,
