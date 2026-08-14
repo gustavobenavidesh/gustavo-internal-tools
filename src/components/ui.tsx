@@ -215,7 +215,6 @@ export function Modal({
   onClosed,
   onCommit,
   title,
-  aside,
   children,
   footer,
 }: {
@@ -226,8 +225,6 @@ export function Modal({
   /** An outside press that switches the sheet rather than closing it. */
   onCommit?: () => void;
   title: ReactNode;
-  /** Sits at the right-hand end of the header, before the close button. */
-  aside?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
 }) {
@@ -462,10 +459,6 @@ export function Modal({
                 pushes the rule away from the words. */}
             <div className="flex shrink-0 items-center justify-between gap-4 border-b border-hairline px-6 pb-4 pt-5">
               <div className="min-w-0 flex-1">{title}</div>
-              {/* Whatever the sheet's contents want to say about themselves, at the
-                  end of the header where the title runs out. `shrink-0`, so it holds
-                  its size and the title gives way instead. */}
-              {aside && <div className="shrink-0">{aside}</div>}
               <IconButton label="Close" onClick={onClose}>
                 <X className="size-4" />
               </IconButton>

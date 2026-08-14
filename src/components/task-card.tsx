@@ -355,10 +355,16 @@ export function TaskCardBody({
         {done && (
           <Check
             // A mark, not a control: small enough to sit under the title's cap
-            // height rather than beside it at the same weight. The extra pixel of
-            // top margin keeps its centre on the first line where `size-4` had it.
-            className="mt-[3px] size-3.5 shrink-0 text-emerald-600"
-            strokeWidth={2.75}
+            // height rather than beside it at the same weight. The margin grows as
+            // the glyph shrinks — it's what holds the tick's centre on the first
+            // line, where `size-4` originally put it.
+            //
+            // The stroke comes down with the size rather than staying put. Weight
+            // is a ratio to the glyph, not a fixed width: 2.75 across 14 points read
+            // as emphasis, and the same stroke across 12 reads as a thicker mark
+            // than the one it replaced, which is the opposite of smaller.
+            className="mt-[5px] size-2.5 shrink-0 text-emerald-600"
+            strokeWidth={2.25}
             aria-label="Done"
           />
         )}

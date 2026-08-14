@@ -194,12 +194,6 @@ export function TaskDialog({
           />
         </div>
       }
-      // The canvas' zoom, up beside the title. An empty element handed down for it
-      // to fill rather than a value passed up: the zoom changes on every event of a
-      // pinch, and holding it here would re-render the whole sheet at gesture rate.
-      // The canvas keeps the state and portals the number into this, so the cost
-      // stays where the state is.
-      aside={<span ref={setZoomSlot} />}
       footer={
         <>
           {/* Pulled out by the ghost buttons' own `px-2`. Their padding is
@@ -420,7 +414,14 @@ export function TaskDialog({
         </div>
 
         <div>
-          <FieldLabel>Visual canvas</FieldLabel>
+          {/* The zoom reads out at the end of the label's line. An empty element
+              handed down for the canvas to fill rather than a value passed up: the
+              zoom changes on every event of a pinch, and holding it here would
+              re-render the whole sheet at gesture rate. */}
+          <div className="flex items-baseline gap-1.5">
+            <FieldLabel>Visual canvas</FieldLabel>
+            <span ref={setZoomSlot} className="mb-1.5" />
+          </div>
           {/* The notes box's surface and corner, since it's the same kind of
               thing: a panel you put things into rather than a control. Its own
               writes, too — a screenshot is saved when it's pasted, not when the

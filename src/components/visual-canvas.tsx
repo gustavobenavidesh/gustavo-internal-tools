@@ -682,12 +682,19 @@ export function VisualCanvas({
         }}
       />
 
-      {/* No zoom buttons — a pinch does it. The readout stays, and only off 1:1,
-          where knowing how far in you are is the useful part. It renders into the
-          section's own header rather than here, which is why it's a portal. */}
+      {/* No zoom buttons — a pinch does it. The readout stands in for them, up in
+          the sheet's header, which is why it's a portal.
+
+          Shown from the moment there's a canvas to measure, rather than only once
+          the zoom is off 1:1. Hiding it at rest made sense when it floated in the
+          corner of the picture, where it would have been one more thing over the
+          image; in a header it just reads as missing, and something that appears
+          mid-pinch is no use for telling you where you are before one. Still
+          nothing on a card with no images, where there's nothing to be zoomed. */}
       {readout &&
-        zoom !== 1 &&
+        (items?.length ?? 0) > 0 &&
         createPortal(
+          // Lighter than the label it sits beside, which is `ink-faint`.
           <span className="font-mono text-[10px] tabular-nums text-ink-ghost">
             {Math.round(zoom * 100)}%
           </span>,
