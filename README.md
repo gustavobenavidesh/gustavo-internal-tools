@@ -14,6 +14,25 @@ migrations below — so run it once, before the first `dev`. Nothing else is
 required: no account, no server, no API keys. Slack sync is opt-in and off until
 `SLACK_USER_TOKEN` is set.
 
+### On Windows
+
+It runs, with two things to get right first.
+
+**Use Node 22 LTS.** `better-sqlite3` is a native module, and this project pins it to
+v11, which publishes prebuilt Windows binaries up to Node 23 and no further. On Node
+24 or newer there's nothing to download, so `npm install` falls back to compiling it
+and asks for Visual Studio Build Tools — which is the wall people hit, and it has
+nothing to do with the app. `node --version` should say v22.
+
+**Make the database's folder before `db:push`.** It creates the file, not the
+directory above it. So for `DATABASE_FILE=C:/Users/you/kanban/kanban.db`, create
+`C:\Users\you\kanban` first. Forward slashes in `.env.local` are correct on Windows —
+Node accepts them, and they save escaping every backslash.
+
+Then `npm run dev` and open http://localhost:3000. To get the app-like window, open
+it in Edge or Chrome and use Install as app; there's no installer and nothing to
+package — it's a local web app that keeps its data in one SQLite file.
+
 ## What it does
 
 - A sidebar of **contexts** — the product area a card is about (Web App, Desktop
@@ -27,6 +46,15 @@ required: no account, no server, no API keys. Slack sync is opt-in and off until
 - Cards carry their contexts and priority as pills under the title — always
   visible, even when unset. Clicking a pill opens its dropdown right there
   instead of going through the task dialog; the context menu is multi-select.
+- Opening a card slides a **sheet in from the right** — full height less the
+  gutter it floats in, about 400px wide, over a blurred board rather than a dimmed
+  one. A task belongs to the column it's in, so the board stays visible beside it;
+  header and footer hold still and only the middle scrolls.
+- Each card has a **visual canvas** under its notes: paste or drop screenshots —
+  a Slack thread, a mock — then drag them anywhere, resize them by the corner, pan
+  in both directions and pinch to zoom, Figma-style, inside a window of its own. A
+  dot grid moves with the view so it reads as a canvas. Double-click an image to see
+  it full size; the crosshair puts the view back at 1:1 with everything in frame.
 - Columns can be **dimmed** from their menu ("Dim cards (parked)"), which renders
   their cards flat and dashed. The Backlog column ships that way.
 - The board itself sits in a card on the canvas, with the sidebar directly on it.
@@ -107,6 +135,95 @@ Permanent deletes are the one gap: a hard-deleted card, column or context can't
 be reconstructed (the join rows and, for Slack cards, the `sourceRef` that keeps
 the importer idempotent are gone), so those confirm rather than pretending to be
 reversible. Archive is the reversible one, and what everything else uses.
+
+**Screenshots live in the database, not beside it.** The visual canvas holds each
+image as a data URL in an `attachments` row. Files on disk would be the textbook
+answer, and it's the wrong one here: this app is one file you can copy, `db:backup`
+is a `VACUUM INTO`, and anything kept outside the database would quietly stop being
+backed up. Base64 costs a third in size and a heavier file, which for a personal
+board is the cheaper half of that trade.
+
+The canvas pans by **scrolling** and zooms by **transform**, and keeping those two
+apart is the whole design. It's a real scroll container with an 8000-point surface
+inside it and the origin at the middle, so an image can sit at a negative coordinate
+and still be somewhere the container can scroll to. The surface is that size at every
+zoom: the scale is a `transform` on a layer inside it, taken about the origin rather
+than the corner, so the content stays gathered in the middle of the surface however
+far in or out the view is.
+
+Zoom used to be a multiplier applied to every coordinate as it was laid out, with the
+surface sized by it. It's worth saying why that went, because it looks like the
+simpler design and it reads correctly: it puts the zoom on the layout path. Every
+event of a pinch relaid out the surface and every image on it, and — worse — moved
+the container's own scroll range underneath the gesture, so the offset that holds a
+point still under the fingers was being clamped to a surface that was still changing
+size. A transform touches neither. What's left per event is a scale and two scroll
+offsets.
+
+That choice is about containment. Scrolling the canvas used to scroll the sheet
+behind it, and being a scroll container is what stops that: the browser's own
+`overscroll-behavior: contain` holds the movement inside the window on both axes,
+where a transform-panned canvas has nothing to hold it but a cancelled wheel event.
+
+The scrolling itself is still driven by hand, though, for a different reason: macOS
+locks a native trackpad scroll to whichever axis the gesture began in. That's right
+for a page and wrong for a canvas, where a diagonal drag should go diagonally, so the
+wheel handler applies both deltas itself. Being a scroll container underneath is what
+makes that safe — if the cancel it relies on ever fails to take, the native scroll it
+was suppressing is still contained, and doubled movement on one axis is a far softer
+failure than the whole panel sliding.
+
+That property is about scroll chaining, though, and says nothing about the event —
+which still bubbles to React's root, and the sheet has a handler there reading
+`deltaX` to slide itself away. So the canvas stops wheel *propagation* as well. Only
+propagation: cancelling would take its own scrolling with it. This is why the
+vertical axis came right on its own and the horizontal one needed a second fix — it
+was the only one with a handler above it. Momentum and rubber-banding come free with it. The cost is that
+zoom has to scroll as well as scale, since scaling about the origin moves everything
+that isn't the origin — and the scale and the scroll that compensates for it have to
+land in the same frame. Left to React's own schedule they don't: the canvas paints
+once at its new scale against the old offset and is dragged back afterwards. Once is
+a glitch, sixty times a second is a pinch that shakes. So the zoom render is flushed
+synchronously and the scroll follows it inside the same event.
+
+Pinch is still hand-attached, because it's the one gesture the container can't
+interpret. Only an image's *width* is stored. Its height always follows from that and the
+natural aspect ratio, which is what makes squashing one impossible — and a stored
+width of zero means "never resized", so a screenshot arrives at a readable size
+instead of its full retina width. The resize grip is counter-scaled by the zoom, on
+the principle that a handle which shrinks with its image eventually can't be hit.
+
+It's handled twice, because browsers disagree about what a pinch is. Chrome sends a
+`wheel` event with `ctrlKey` set; WebKit sends its own non-standard
+`gesturestart`/`gesturechange` pair with a cumulative `scale` and no wheel event at
+all — so on the browser this board actually runs in, the wheel path never fires.
+
+WebKit raises those gesture events for *any* two-finger gesture, though, a plain
+scroll included — and preventing one takes the wheel events after it down with it,
+which is how panning came to stop working the moment pinch was added. A gesture is
+only claimed once its `scale` has actually moved off 1, which a scroll never does.
+
+That claim then holds until the fingers lift, rather than being re-tested per event.
+`scale` is cumulative from the spread the pinch started at, so it passes back through
+1 whenever the fingers return to where they began — and re-testing left a dead patch
+right there, where the zoom stopped tracking and then jumped once the fingers cleared
+it.
+
+Holding the claim does a second job: while a pinch is running, wheel events are
+cancelled and otherwise ignored. The two drive the zoom in incompatible ways — the
+gesture sets it absolutely from the spread the fingers started at, a wheel nudges it
+relatively from wherever it happens to be — so interleaved, every gesture event
+discards what the wheels between them just did and the zoom oscillates. Each
+oscillation drags the view with it, because holding a point still costs a scroll
+correction proportional to how far off centre that point is. Which is exactly how it
+presented: steady in the middle of the window, throwing the canvas around at the
+edges.
+
+What it does cost is care about reads. Those rows are never joined into
+`getBoardData` — a card fetches its own canvas when it's opened, through
+`listAttachments`, so the board's first paint never waits on every screenshot it
+has ever been given. And the canvas writes on paste rather than on Save, so it
+isn't part of the sheet's draft; ⌘Z doesn't reach it yet.
 
 **A folded card flies into the one that took it.** The board removes it on the
 drop, so a copy of it (`fold-flight.tsx`) is left travelling to the target and

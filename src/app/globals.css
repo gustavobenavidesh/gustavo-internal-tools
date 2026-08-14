@@ -110,6 +110,8 @@
      centred on the *viewport* has to compensate by half the sidebar width less
      half the board's right gutter. Kept here so the two can't drift apart. */
   --sidebar-width: 236px;
+  /* The task sheet, overwritten by its own resize handle. */
+  --sheet-width: 400px;
   --board-gutter: 0.875rem;
 
   /* Paper grain, shared by the app background and the `paper-grain` utility so
@@ -138,6 +140,15 @@
   --corner-card: 20px;
   --corner-menu: 16px;
   --corner-control: 10px;
+  /* The sheet's fields — the two toggles and the notes box. Rounder than the
+     controls beside them, which is the point: they're surfaces you put things
+     into rather than buttons you press. Its own token so the buttons keep
+     `--corner-control`. */
+  --corner-field: 14px;
+  /* And the notes box, which is a panel rather than a control — rounder than the
+     toggles above it, in proportion to its size. Level with `--corner-card`, since
+     at this size that's what it reads as. */
+  --corner-notes: 20px;
   --corner-chip: 11px;
 }
 
@@ -466,6 +477,64 @@ body::before {
     );
 }
 
+/**
+ * What the notes editor renders. Tailwind's preflight strips list markers and
+ * flattens quotes, so a `contenteditable` producing real `<ul>` and `<blockquote>`
+ * needs them put back — scoped to this one utility, since this is the only place
+ * in the app that renders markup a person typed.
+ *
+ * `pre-wrap` is what lets notes written before this was a rich field keep their
+ * line breaks: they're plain text with newlines sitting in the same column, and
+ * nothing had to be migrated.
+ */
+@utility rich-text {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+
+  & b,
+  & strong {
+    font-weight: 600;
+  }
+
+  & i,
+  & em {
+    font-style: italic;
+  }
+
+  & ul,
+  & ol {
+    margin: 0.25rem 0;
+    padding-left: 1.35rem;
+  }
+
+  /* Longhand: the `list-style` shorthand comes out of the build as
+     `list-style: outside` with the type dropped. */
+  & ul {
+    list-style-type: disc;
+  }
+
+  & ol {
+    list-style-type: decimal;
+  }
+
+  & li::marker {
+    color: var(--color-ink-ghost);
+  }
+
+  & blockquote {
+    margin: 0.35rem 0;
+    padding-left: 0.7rem;
+    border-left: 2px solid var(--color-hairline-strong);
+    color: var(--color-ink-soft);
+  }
+
+  & a {
+    color: var(--color-accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
 @utility scrollbar-none {
   scrollbar-width: none;
   &::-webkit-scrollbar {
@@ -499,4 +568,67 @@ body::before {
 
 @utility animate-fade-in {
   animation: fade-in 120ms ease-out;
+}
+
+/**
+ * The task sheet arriving from the right. Past its own width, so it starts clear
+ * of the gutter it floats in rather than peeling off the screen edge.
+ *
+ * Longer than `pop-in` because it travels: 120ms over 400px reads as a snap, and
+ * the point of a sheet is that you see it come from somewhere.
+ *
+ * It overshoots by three pixels and comes back, which is the whole spring —
+ * stated in pixels rather than left to a cubic-bezier with a control point past 1,
+ * where the same gentle-looking curve would overshoot a proportion of 400px and
+ * throw the sheet well clear of its resting place. Per-keyframe easing does the
+ * rest: decelerating on the way in, then well over a third of the time spent
+ * easing three pixels back, which is what keeps the return a settle rather than a
+ * second movement.
+ *
+ * Transform only — no fade, and that is not a style choice. An element at
+ * `opacity` below 1 becomes a Backdrop Root, and the sheet's frosted fill is a
+ * `backdrop-filter` on a descendant: for as long as this animated the opacity,
+ * there was nothing behind that filter to sample, so the glass switched on only
+ * as the animation landed on 1. Nothing is lost, either — the sheet starts
+ * outside the viewport, so there was no moment when a fade could be seen.
+ */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(105%);
+    animation-timing-function: cubic-bezier(0.16, 0.84, 0.28, 1);
+  }
+  62% {
+    transform: translateX(-3px);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.3, 1);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@utility animate-slide-in-right {
+  animation: slide-in-right 400ms both;
+}
+
+/**
+ * And leaving, the same move run backwards. No overshoot: a spring settles into
+ * somewhere, and there's nowhere to settle on the way out. Quicker than the
+ * arrival and accelerating rather than decelerating, because a sheet you've
+ * dismissed shouldn't ask to be watched.
+ *
+ * No fade here either, for the reason above: the glass would drop out the instant
+ * the sheet started leaving. It travels past its own width, and its shadow spills
+ * sideways by less than the gutter, so nothing of it is left on screen to see.
+ */
+@keyframes slide-out-right {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translateX(105%);
+  }
+}
+
+@utility animate-slide-out-right {
+  animation: slide-out-right 240ms cubic-bezier(0.4, 0, 0.75, 0.3) both;
 }

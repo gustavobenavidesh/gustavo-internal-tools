@@ -7,7 +7,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  Archive,
   Check,
   Moon,
   MoreHorizontal,
@@ -32,8 +31,7 @@ import type {
   ClientTask,
   DropHint,
 } from "@/lib/types";
-import { TargetRings } from "@/components/target-rings";
-import { columnIcon, columnIconTone } from "@/lib/column-icons";
+import { ColumnGlyph } from "@/components/column-glyph";
 import { type Room, roomFor, roomInColumn } from "@/lib/drag";
 import { cn } from "@/lib/utils";
 
@@ -74,6 +72,8 @@ type Props = {
   dropHint: DropHint | null;
   /** The card being dragged anywhere on the board, so this column can make room. */
   draggingTaskId: string | null;
+  /** The card the task sheet is showing, if it's one of this column's. */
+  viewingTaskId: string | null;
   /** Controlled so the `n` shortcut can open the first column's composer. */
   composing: boolean;
   onComposingChange: (open: boolean) => void;
@@ -88,7 +88,6 @@ type Props = {
   onToggleDone: (columnId: string, isDone: boolean) => void;
   onToggleMuted: (columnId: string, isMuted: boolean) => void;
   onToggleFocus: (columnId: string, isFocus: boolean) => void;
-  onArchiveAll: (columnId: string) => void;
 };
 
 export function BoardColumn({
@@ -99,6 +98,7 @@ export function BoardColumn({
   totalCount,
   dropHint,
   draggingTaskId,
+  viewingTaskId,
   composing,
   onComposingChange,
   onOpenTask,
@@ -112,7 +112,6 @@ export function BoardColumn({
   onToggleDone,
   onToggleMuted,
   onToggleFocus,
-  onArchiveAll,
 }: Props) {
   const {
     attributes,
@@ -149,9 +148,6 @@ export function BoardColumn({
     return () => observer.disconnect();
   }, [measure, tasks.length]);
 
-  // The featured column gets the two-ring mark; everything else takes a Lucide
-  // glyph from the name/flag mapping.
-  const ColumnGlyph = column.isFocus ? TargetRings : columnIcon(column);
   const overLimit = column.wipLimit !== null && totalCount > column.wipLimit;
   const labelsById = new Map(labels.map((l) => [l.id, l]));
 
@@ -215,17 +211,10 @@ export function BoardColumn({
           {...attributes}
           {...listeners}
         >
-          <ColumnGlyph
-            strokeWidth={column.isDone ? 2.5 : 2}
-            className={cn(
-              "size-4",
-              // Matches the title: accent on the featured column, otherwise
-              // the same tone as every other column icon.
-              column.isFocus
-                ? "text-accent"
-                : (columnIconTone(column) ?? "text-ink-faint"),
-            )}
-          />
+          {/* The featured column gets the two-ring mark; everything else takes a
+              Lucide glyph from the name/flag mapping. Tone and stroke come with
+              it — see `ColumnGlyph`, which the sheet's column field shares. */}
+          <ColumnGlyph column={column} className="size-4" />
         </button>
 
         {renaming ? (
@@ -286,7 +275,6 @@ export function BoardColumn({
               onToggleDone={(isDone) => onToggleDone(column.id, isDone)}
               onToggleMuted={(isMuted) => onToggleMuted(column.id, isMuted)}
               onToggleFocus={(isFocus) => onToggleFocus(column.id, isFocus)}
-              onArchiveAll={() => onArchiveAll(column.id)}
             />
           )}
         </div>
@@ -327,6 +315,7 @@ export function BoardColumn({
               contexts={contexts}
               muted={column.isMuted}
               drop={dropHint?.targetId === task.id ? dropHint : null}
+              viewing={viewingTaskId === task.id}
               onOpen={onOpenTask}
               onSetContexts={onSetTaskContexts}
               onSetPriority={onSetTaskPriority}
@@ -395,12 +384,15 @@ function Composer({
 
   useEffect(() => ref.current?.focus(), []);
 
+  /**
+   * Adding closes the composer, rather than clearing itself for another card.
+   * The card you just wrote appears where the field was, and an empty box left
+   * open on top of it reads as though the first one hadn't landed.
+   */
   const submit = () => {
     const title = draft.trim();
-    if (!title) return onCancel();
-    onSubmit(title);
-    setDraft("");
-    ref.current?.focus();
+    if (title) onSubmit(title);
+    onCancel();
   };
 
   /**
@@ -471,7 +463,6 @@ function ColumnMenu({
   onToggleDone,
   onToggleMuted,
   onToggleFocus,
-  onArchiveAll,
 }: {
   column: ClientColumn;
   taskCount: number;
@@ -482,7 +473,6 @@ function ColumnMenu({
   onToggleDone: (isDone: boolean) => void;
   onToggleMuted: (isMuted: boolean) => void;
   onToggleFocus: (isFocus: boolean) => void;
-  onArchiveAll: () => void;
 }) {
   const [limitDraft, setLimitDraft] = useState(
     column.wipLimit === null ? "" : String(column.wipLimit),
@@ -565,19 +555,6 @@ function ColumnMenu({
       </label>
 
       <div className="my-1 h-px bg-hairline" />
-
-      <button
-        type="button"
-        className={item}
-        disabled={taskCount === 0}
-        onClick={() => {
-          onArchiveAll();
-          onClose();
-        }}
-      >
-        <Archive className="size-3.5" />
-        Archive all {taskCount > 0 && `(${taskCount})`}
-      </button>
 
       <button
         type="button"

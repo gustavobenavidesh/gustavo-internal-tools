@@ -29,6 +29,18 @@ export function positionBefore(first?: number | null): number {
 }
 
 /**
+ * The words out of a note, with its markup dropped.
+ *
+ * Notes are rich text stored as HTML, and board search matches on them — without
+ * this, searching for "li" or "strong" would hit the tags instead of anything
+ * anyone wrote. Not a sanitiser and not trying to be: the editor pastes as plain
+ * text, so the only markup ever stored is what its own commands produced.
+ */
+export function plainText(html: string) {
+  return html.replace(/<[^>]*>/g, " ");
+}
+
+/**
  * A card title cut down to fit in a sentence — the toast quotes two of them at
  * once, so each is clipped rather than the line being allowed to run. Cut in code
  * rather than with `text-overflow`, which would truncate the whole sentence and

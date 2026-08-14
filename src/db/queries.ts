@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "./index";
 import {
   type Board,
@@ -209,14 +209,4 @@ function ensureContexts(boardId: string): Context[] {
   if (existing.length > 0) return existing;
 
   return db.insert(contexts).values(contextValues(boardId)).returning().all();
-}
-
-/** Archived tasks are hidden from the board but kept so nothing is truly lost. */
-export function getArchivedTasks(boardId: string): Task[] {
-  return db
-    .select()
-    .from(tasks)
-    .where(and(eq(tasks.boardId, boardId), isNotNull(tasks.archivedAt)))
-    .orderBy(desc(tasks.archivedAt))
-    .all();
 }

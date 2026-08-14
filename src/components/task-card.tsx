@@ -2,16 +2,15 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AlignLeft, Check, Plus } from "lucide-react";
+import { Check, FileText, Plus } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { useLayoutEffect, useRef, useState } from "react";
-import { AnchoredMenu, MENU_ITEM } from "@/components/ui";
+import { AnchoredMenu, MENU_ITEM, PILL } from "@/components/ui";
 import { PRIORITIES, type Priority } from "@/db/schema";
 import { PRIORITY_STYLES, labelColor } from "@/lib/colors";
 import { contextIcon } from "@/lib/context-icons";
 import { PriorityBars } from "@/components/priority-bars";
 import { SlackMark } from "@/components/slack-mark";
-import { DUE_TONES, formatDue } from "@/lib/dates";
 import type {
   ClientContext,
   ClientLabel,
@@ -19,14 +18,6 @@ import type {
   DropHint,
 } from "@/lib/types";
 import { cn, noOrphans } from "@/lib/utils";
-
-/**
- * Fixed height rather than padding-derived: an icon-only pill (the docked `+`)
- * has no text line box, so it would otherwise come out shorter than its
- * neighbours and the docked pair wouldn't line up.
- */
-const PILL =
-  "inline-flex h-5 max-w-full items-center gap-1 rounded-full px-2 text-[10px] font-medium leading-none ring-1 ring-inset";
 
 /** Unassigned pills stay on the card as empty slots you can click to fill. */
 const EMPTY_PILL =
@@ -44,6 +35,8 @@ type Props = {
    * the checklist item it would gain. Null on every other card.
    */
   drop?: DropHint | null;
+  /** This is the card the sheet is showing. */
+  viewing?: boolean;
   onOpen: (taskId: string) => void;
   onSetContexts: (taskId: string, contextIds: string[]) => void;
   onSetPriority: (taskId: string, priority: Priority) => void;
@@ -56,6 +49,7 @@ export function TaskCard({
   contexts,
   muted,
   drop,
+  viewing,
   onOpen,
   onSetContexts,
   onSetPriority,
@@ -120,7 +114,17 @@ export function TaskCard({
         wrapper.current = node;
         setNodeRef(node);
       }}
-      style={{ transform: CSS.Translate.toString(transform), transition }}
+      style={{
+        transform: CSS.Translate.toString(transform),
+        transition,
+        // Only while it's actually displaced. A card carries a shadow and a
+        // clip-path plate, so moving one without its own layer repaints both
+        // every frame; promoting all of them all the time would be worse still.
+        willChange: transform ? "transform" : undefined,
+      }}
+      // What the task sheet's outside-press check looks for, so a press here
+      // switches the open sheet to this card instead of closing it.
+      data-card={task.id}
       // While this card is the drag source it stays in the flow as a hole for
       // the overlay to land in.
       className={cn(isDragging && "opacity-0")}
@@ -131,6 +135,7 @@ export function TaskCard({
         contexts={contexts}
         muted={muted}
         drop={drop}
+        viewing={viewing}
         onSetContexts={onSetContexts}
         onSetPriority={onSetPriority}
         onToggleSubtask={onToggleSubtask}
@@ -153,6 +158,7 @@ export function TaskCardBody({
   contexts,
   muted,
   drop,
+  viewing,
   overlay,
   className,
   onSetContexts,
@@ -165,12 +171,12 @@ export function TaskCardBody({
   contexts: ClientContext[];
   muted?: boolean;
   drop?: DropHint | null;
+  viewing?: boolean;
   overlay?: boolean;
   onSetContexts?: (taskId: string, contextIds: string[]) => void;
   onSetPriority?: (taskId: string, priority: Priority) => void;
   onToggleSubtask?: (taskId: string, subtaskId: string, done: boolean) => void;
 } & React.HTMLAttributes<HTMLDivElement>) {
-  const due = task.dueDate ? formatDue(task.dueDate) : null;
   const priority = PRIORITY_STYLES[task.priority];
   const done = task.completedAt !== null;
   const assigned = contexts.filter((c) => task.contextIds.includes(c.id));
@@ -240,8 +246,11 @@ export function TaskCardBody({
         // Opacity is in the transition list for the overlay's sake: it dims as it
         // comes to rest over a card it would fold into, and the flight it hands
         // off to starts from that exact value — a snap here would be the first
-        // frame of the animation.
-        "group relative isolate w-full cursor-grab rounded-[var(--corner-card)] text-left transition-[box-shadow,transform,opacity]",
+        // frame of the animation. `scale` is listed separately from `transform`
+        // because Tailwind sets it as its own property, so every `scale-*` below
+        // — the press, the overlay, the lift when a card is about to swallow
+        // another — would otherwise jump instead of easing.
+        "group relative isolate w-full cursor-grab rounded-[var(--corner-card)] text-left transition-[box-shadow,transform,opacity,scale]",
         // The shadow stays a box-shadow on this root, which is deliberately left
         // unclipped. Moving it onto the plate would mean a `filter` — and so a
         // repaint layer — per card during a drag, and at a 12px radius the gap
@@ -263,6 +272,10 @@ export function TaskCardBody({
           : "shadow-[0_5px_16px_-6px] shadow-shade/16 hover:shadow-shade/24",
         overlay &&
           "rotate-3 scale-[1.03] cursor-grabbing shadow-2xl shadow-shade/30",
+        // A press gives a little under the finger. Only on the real card — the
+        // drag overlay is never pressed, and a pointer held down on a card that's
+        // about to be dragged has already gone invisible by then.
+        !overlay && "active:scale-[0.985] active:duration-75",
         // Lifts towards the card being dropped in, the way a folder opens.
         swallowing && "scale-[1.02]",
         className,
@@ -289,6 +302,16 @@ export function TaskCardBody({
           />
         </div>
       )}
+      {/* Which card the sheet is showing. Down the left edge, on the one axis the
+          drop bars don't use — those mark the slot above or below a card, so a
+          vertical tick beside it can't be mistaken for one. */}
+      {viewing && !overlay && (
+        <div
+          aria-hidden
+          className="absolute inset-y-5 -left-px z-10 w-[3px] rounded-full bg-accent/75"
+        />
+      )}
+
       {/* The insertion slot, drawn as a bar along whichever edge the card would
           land on. Inside the card's own box on purpose: a line *between* cards
           would need layout space, and shifting the list is the one thing a drag
@@ -320,9 +343,21 @@ export function TaskCardBody({
           {noOrphans(task.title)}
         </p>
 
+        {/* A mark on the title's row rather than a row of its own — it says
+            something about the card, the way the tick beside it does. */}
+        {task.description && (
+          <FileText
+            className="mt-[3px] size-3.5 shrink-0 text-ink-ghost"
+            aria-label="Has notes"
+          />
+        )}
+
         {done && (
           <Check
-            className="mt-0.5 size-4 shrink-0 text-emerald-600"
+            // A mark, not a control: small enough to sit under the title's cap
+            // height rather than beside it at the same weight. The extra pixel of
+            // top margin keeps its centre on the first line where `size-4` had it.
+            className="mt-[3px] size-3.5 shrink-0 text-emerald-600"
             strokeWidth={2.75}
             aria-label="Done"
           />
@@ -493,47 +528,34 @@ export function TaskCardBody({
         ))}
       </div>
 
-      {(due || task.description || task.source) && (
+      {/* The due date is set and shown in the sheet only — it isn't on the card
+          for now. `formatDue` and `DUE_TONES` in `src/lib/dates.ts` still hold the
+          relative wording and the overdue/soon tones if it comes back. */}
+      {task.source && (
         <div className="mt-3 flex items-center gap-2 text-[11px] text-ink-faint">
-          {due && (
-            <span
-              className={cn(
-                "rounded px-1.5 py-0.5 font-medium ring-1 ring-inset",
-                DUE_TONES[due.tone],
-              )}
-            >
-              {due.text}
-            </span>
-          )}
-          {task.description && (
-            <AlignLeft className="size-3.5" aria-label="Has notes" />
-          )}
-
           {/* Provenance, and a way back to it. Pointer events stop here for the
               same reason the pills do: this is a link inside a draggable card
               that also opens the dialog on click. */}
-          {task.source && (
-            <a
-              href={task.source.url}
-              target="_blank"
-              rel="noreferrer"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-              title={[
-                "Open in Slack",
-                task.source.author && `pinned from ${task.source.author}`,
-                task.source.channel && `in #${task.source.channel}`,
-              ]
-                .filter(Boolean)
-                .join(" — ")}
-              className="ml-auto inline-flex min-w-0 items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-black/5 hover:text-ink-soft"
-            >
-              <SlackMark className="size-3 shrink-0" />
-              {task.source.channel && (
-                <span className="truncate">#{task.source.channel}</span>
-              )}
-            </a>
-          )}
+          <a
+            href={task.source.url}
+            target="_blank"
+            rel="noreferrer"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            title={[
+              "Open in Slack",
+              task.source.author && `pinned from ${task.source.author}`,
+              task.source.channel && `in #${task.source.channel}`,
+            ]
+              .filter(Boolean)
+              .join(" — ")}
+            className="inline-flex min-w-0 items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-black/5 hover:text-ink-soft"
+          >
+            <SlackMark className="size-3 shrink-0" />
+            {task.source.channel && (
+              <span className="truncate">#{task.source.channel}</span>
+            )}
+          </a>
         </div>
       )}
       </div>

@@ -27,7 +27,17 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex h-full flex-col overflow-hidden">{children}</body>
+      {/* No spellcheck anywhere. `spellcheck` is inherited, so one attribute here
+          covers every field in the app — titles, the notes editor, the composer,
+          the rename fields — rather than each of them opting out. Card titles are
+          full of shorthand and product names, and the squiggles under them were
+          noise rather than help. */}
+      <body
+        spellCheck={false}
+        className="flex h-full flex-col overflow-hidden"
+      >
+        {children}
+      </body>
     </html>
   );
 }

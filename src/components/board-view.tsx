@@ -48,7 +48,7 @@ import { TaskDialog, type TaskPatch } from "@/components/task-dialog";
 import { celebrate } from "@/lib/celebrate";
 import type { Priority } from "@/db/schema";
 import type { HistoryFact } from "@/lib/history-fact";
-import { clipTitle } from "@/lib/utils";
+import { clipTitle, plainText } from "@/lib/utils";
 import type {
   ClientBoard,
   ClientBoardData,
@@ -343,7 +343,7 @@ export function BoardView({
       if (
         query &&
         !task.title.toLowerCase().includes(query) &&
-        !task.description.toLowerCase().includes(query)
+        !plainText(task.description).toLowerCase().includes(query)
       )
         return false;
       return true;
@@ -715,10 +715,14 @@ export function BoardView({
   };
 
   /**
-   * Archiving and its inverse, as one pair. Each card's slot travels with it, so
-   * coming back doesn't mean landing at the top of the column, and both
-   * directions move the whole set in a single step — clearing a done column
-   * shouldn't take eleven ⌘Zs to put right.
+   * Archiving and its inverse, as one pair. Nothing on screen archives any more —
+   * that button is now "Move to backlog", which puts the card somewhere you can
+   * find it — but ⌘Z still needs this to undo a card being *created*. Deleting
+   * would work once and then have nothing to redo; archiving keeps the row and its
+   * id, so redo brings back the same card rather than a copy of it.
+   *
+   * Each card's slot travels with it, so coming back doesn't mean landing at the
+   * top of the column, and both directions move the whole set in one step.
    */
   type ArchiveEntry = { task: ClientTask; index: number };
 
@@ -762,7 +766,7 @@ export function BoardView({
   };
 
   const archiveCard = (taskId: string) =>
-    archiveCards(entryFor(taskId), "the archive");
+    archiveCards(entryFor(taskId), "adding that card");
 
   // Checklists: the client keeps the whole array, so each change replaces it
   // locally and persists just the one row that moved.
@@ -1035,33 +1039,9 @@ export function BoardView({
     );
   };
 
-  /** Clears a whole column off the board in one go — and back, in one ⌘Z. */
-  const archiveColumnTasks = (columnId: string) => {
-    const entries = (live.current.taskOrder[columnId] ?? []).flatMap((id, index) => {
-      const task = live.current.tasks[id];
-      return task ? [{ task, index }] : [];
-    });
-    archiveCards(entries, "archiving that column");
-  };
-
   /** From the dialog's column picker: lands at the bottom of the column. */
   const moveTaskToColumn = (taskId: string, columnId: string) =>
     moveTaskTo(taskId, columnId, live.current.taskOrder[columnId]?.length ?? 0);
-
-  const createLabel = async (
-    name: string,
-    color: string,
-  ): Promise<ClientLabel | null> => {
-    try {
-      const label = await actions.createLabel(boardId, name, color);
-      dispatch({ type: "label/add", label });
-      return label;
-    } catch (cause) {
-      console.error(cause);
-      setError("Couldn't create that label");
-      return null;
-    }
-  };
 
   const createContext = (name: string, color: string) => {
     persist(async () => {
@@ -1199,12 +1179,9 @@ export function BoardView({
         (e.key.toLowerCase() === "z" || e.code === "KeyZ")
       ) {
         e.preventDefault();
-        // The open card holds unsaved drafts of its title and notes, which it
-        // writes on close — undoing underneath it would only be clobbered.
-        if (openTaskId) {
-          setNotice({ text: "Close the card first to undo" });
-          return;
-        }
+        // Works with the sheet open too: it follows whatever an undo does to the
+        // card it's showing, as long as you haven't typed into it — see the draft
+        // effect in `TaskDialog`.
         step(e.shiftKey ? "redo" : "undo");
         return;
       }
@@ -1246,6 +1223,30 @@ export function BoardView({
   }, [notice]);
 
   const openTask = openTaskId ? state.tasks[openTaskId] : null;
+
+  /**
+   * The board's parking lot: the muted column, found by its flag rather than by
+   * the name "Backlog" — the same way `syncSlackPins` picks its import target, so
+   * a rename can't break either of them. Undefined if no column is marked, which
+   * is what hides the sheet's button.
+   */
+  const backlogColumnId = state.columnOrder.find(
+    (id) => state.columns[id]?.isMuted,
+  );
+
+  /**
+   * The sheet outlives `openTaskId` by the length of its slide-out, so it has
+   * something to render on the way off screen — including a card that archive or
+   * delete has already taken out of the board. `leaving` holds that last copy and
+   * the sheet clears it when the animation ends.
+   */
+  const shown = useRef<ClientTask | null>(null);
+  if (openTask) shown.current = openTask;
+  const [leaving, setLeaving] = useState<ClientTask | null>(null);
+  useEffect(() => {
+    if (openTaskId === null && shown.current) setLeaving(shown.current);
+  }, [openTaskId]);
+  const sheetTask = openTask ?? leaving;
   const draggedTask =
     dragging?.type === "task" ? state.tasks[dragging.id] : null;
 
@@ -1379,6 +1380,7 @@ export function BoardView({
                       draggingTaskId={
                         dragging?.type === "task" ? dragging.id : null
                       }
+                      viewingTaskId={openTaskId}
                       composing={composeColumnId === columnId}
                       onComposingChange={(open) =>
                         setComposeColumnId(open ? columnId : null)
@@ -1412,7 +1414,6 @@ export function BoardView({
                       onToggleDone={(id, isDone) =>
                         patchColumn(id, { isDone }, "that column change")
                       }
-                      onArchiveAll={archiveColumnTasks}
                     />
                   );
                 })}
@@ -1454,31 +1455,39 @@ export function BoardView({
         </div>
       </main>
 
-      {openTask && (
+      {sheetTask && (
         <TaskDialog
-          task={openTask}
+          // Not keyed by card any more. It was, to stop a switch handing the next
+          // card the last one's form — but the sheet's own draft effect now
+          // re-seeds when the task changes underneath it, and remounting was what
+          // made a switch slide the sheet out and back in from off screen.
+          task={sheetTask}
           columns={state.columnOrder.map((id) => state.columns[id])}
-          labels={state.labels}
           contexts={state.contexts}
+          open={openTaskId !== null}
           onClose={() => setOpenTaskId(null)}
-          onSave={(patch) => saveTask(openTask.id, patch)}
-          onMoveToColumn={(columnId) => moveTaskToColumn(openTask.id, columnId)}
-          onCreateLabel={createLabel}
-          onAddSubtask={(title) => addSubtask(openTask.id, title)}
+          onClosed={() => setLeaving(null)}
+          onSave={(patch) => saveTask(sheetTask.id, patch)}
+          onMoveToColumn={(columnId) => moveTaskToColumn(sheetTask.id, columnId)}
+          onAddSubtask={(title) => addSubtask(sheetTask.id, title)}
           onUpdateSubtask={(subtaskId, patch) =>
-            updateSubtask(openTask.id, subtaskId, patch)
+            updateSubtask(sheetTask.id, subtaskId, patch)
           }
-          onDeleteSubtask={(subtaskId) => deleteSubtask(openTask.id, subtaskId)}
-          onArchive={() => {
-            archiveCard(openTask.id);
-            setOpenTaskId(null);
-          }}
+          onDeleteSubtask={(subtaskId) => deleteSubtask(sheetTask.id, subtaskId)}
+          onMoveToBacklog={
+            backlogColumnId && sheetTask.columnId !== backlogColumnId
+              ? () => {
+                  moveTaskToColumn(sheetTask.id, backlogColumnId);
+                  setOpenTaskId(null);
+                }
+              : undefined
+          }
           onDelete={() => {
             // The one edit ⌘Z can't reach, which is why the dialog asks first.
-            dispatch({ type: "task/remove", taskIds: [openTask.id] });
+            dispatch({ type: "task/remove", taskIds: [sheetTask.id] });
             setOpenTaskId(null);
             persist(
-              () => actions.deleteTask(openTask.id),
+              () => actions.deleteTask(sheetTask.id),
               "Couldn't delete that task",
             );
           }}

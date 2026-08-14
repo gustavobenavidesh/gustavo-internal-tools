@@ -1,32 +1,43 @@
 "use client";
 
 import { format } from "date-fns";
-import { Archive, Check, Plus, Tag, Trash2 } from "lucide-react";
-import { type CSSProperties, useMemo, useState } from "react";
+import { Check, ChevronsUpDown, Pencil, Trash2 } from "lucide-react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   Button,
   FieldLabel,
   IconButton,
   Input,
   Modal,
+  PILL,
   Plate,
-  Textarea,
 } from "@/components/ui";
-import { LABEL_COLOR_KEYS, PRIORITY_STYLES, labelColor } from "@/lib/colors";
+import { PRIORITY_STYLES, labelColor } from "@/lib/colors";
+import { ColumnGlyph } from "@/components/column-glyph";
+import { RichNotes } from "@/components/rich-notes";
+import { VisualCanvas } from "@/components/visual-canvas";
 import { contextIcon } from "@/lib/context-icons";
 import { PriorityBars } from "@/components/priority-bars";
 import { fromDateInputValue, toDateInputValue } from "@/lib/dates";
 import { PRIORITIES, type Priority } from "@/db/schema";
-import type {
-  ClientColumn,
-  ClientContext,
-  ClientLabel,
-  ClientTask,
-} from "@/lib/types";
+import type { ClientColumn, ClientContext, ClientTask } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const SELECT =
-  "h-9 w-full rounded-lg bg-panel-raised px-2 text-sm text-ink ring-1 ring-hairline focus:ring-accent/60";
+/**
+ * Both fields are native controls with their own box turned off, sitting inside a
+ * `FieldShell` that draws the app's squircle behind them — `rounded-lg` was a
+ * plain circular 8px, which read as a stranger next to everything else here. No
+ * `outline-none`: the shell tints its edge on focus, and keyboard focus still gets
+ * the global outline on top of that.
+ */
+const FIELD =
+  "h-8 w-full rounded-[var(--corner-field)] bg-transparent px-2.5 text-[13px] font-medium text-ink";
 
 export type TaskPatch = {
   title: string;
@@ -40,14 +51,19 @@ export type TaskPatch = {
 type Props = {
   task: ClientTask;
   columns: ClientColumn[];
-  labels: ClientLabel[];
   contexts: ClientContext[];
+  /** False while the sheet slides out; `onClosed` fires when it has gone. */
+  open: boolean;
   onClose: () => void;
+  onClosed: () => void;
   onSave: (patch: TaskPatch) => void;
   onMoveToColumn: (columnId: string) => void;
-  onArchive: () => void;
+  /**
+   * Files the card in the board's parking lot. Absent when there's no muted
+   * column to move it to, or when it's already there.
+   */
+  onMoveToBacklog?: () => void;
   onDelete: () => void;
-  onCreateLabel: (name: string, color: string) => Promise<ClientLabel | null>;
   onAddSubtask: (title: string) => void;
   onUpdateSubtask: (
     subtaskId: string,
@@ -56,75 +72,147 @@ type Props = {
   onDeleteSubtask: (subtaskId: string) => void;
 };
 
-export function TaskDialog({
-  task,
-  columns,
-  labels,
-  contexts,
-  onClose,
-  onSave,
-  onMoveToColumn,
-  onArchive,
-  onDelete,
-  onCreateLabel,
-  onAddSubtask,
-  onUpdateSubtask,
-  onDeleteSubtask,
-}: Props) {
-  const [draft, setDraft] = useState<TaskPatch>({
+/** The card's saved values, in the shape the form edits them in. */
+function asPatch(task: ClientTask): TaskPatch {
+  return {
     title: task.title,
     description: task.description,
     priority: task.priority,
     dueDate: task.dueDate,
     labelIds: task.labelIds,
     contextIds: task.contextIds,
-  });
+  };
+}
 
-  const dirty = useMemo(
-    () =>
-      draft.title !== task.title ||
-      draft.description !== task.description ||
-      draft.priority !== task.priority ||
-      draft.dueDate !== task.dueDate ||
-      draft.contextIds.join() !== task.contextIds.join() ||
-      draft.labelIds.join() !== task.labelIds.join(),
-    [draft, task],
+function same(a: TaskPatch, b: TaskPatch) {
+  return (
+    a.title === b.title &&
+    a.description === b.description &&
+    a.priority === b.priority &&
+    a.dueDate === b.dueDate &&
+    a.labelIds.join() === b.labelIds.join() &&
+    a.contextIds.join() === b.contextIds.join()
   );
+}
+
+export function TaskDialog({
+  task,
+  columns,
+  contexts,
+  open,
+  onClose,
+  onClosed,
+  onSave,
+  onMoveToColumn,
+  onMoveToBacklog,
+  onDelete,
+  onAddSubtask,
+  onUpdateSubtask,
+  onDeleteSubtask,
+}: Props) {
+  const [draft, setDraft] = useState<TaskPatch>(() => asPatch(task));
+  const dirty = !same(draft, asPatch(task));
+
+  /** The element the canvas puts its zoom readout in — see where it's rendered. */
+  const [zoomSlot, setZoomSlot] = useState<HTMLElement | null>(null);
+
+  /**
+   * The card can change while the sheet is open — ⌘Z or ⇧⌘Z, a pill clicked on
+   * the board behind, a Slack poll. The form follows it, so an undo isn't quietly
+   * reverted by a draft seeded before it happened.
+   *
+   * Compared against the *previous* task rather than the current one: after an
+   * undo the draft no longer matches the card, and that's true whether the user
+   * typed or the card moved under them. Matching what the card said a moment ago
+   * is what separates the two — and if it doesn't match, the edits here are the
+   * newer thing and are left alone.
+   */
+  const seen = useRef(task);
+  useEffect(() => {
+    const previous = seen.current;
+    seen.current = task;
+    if (previous !== task && same(draft, asPatch(previous))) {
+      setDraft(asPatch(task));
+    }
+  });
 
   const save = () => {
     if (draft.title.trim()) onSave(draft);
     onClose();
   };
 
-  const toggleLabel = (labelId: string) =>
-    setDraft((d) => ({
-      ...d,
-      labelIds: d.labelIds.includes(labelId)
-        ? d.labelIds.filter((id) => id !== labelId)
-        : [...d.labelIds, labelId],
-    }));
+  /**
+   * The parking lot column, for the button's glyph and its name. Taken through
+   * `ColumnGlyph` rather than a hardcoded icon, so the button wears whatever that
+   * column's own header wears — and named after it, so a board whose lot is called
+   * Icebox doesn't get a button promising a Backlog.
+   */
+  const backlog = columns.find((column) => column.isMuted);
+
+  /**
+   * The column the card is in, whose mark sits in the select. `ColumnGlyph` is the
+   * same component that column's own header uses, so the field shows exactly the
+   * mark you'd look for on the board.
+   *
+   * Only the closed field can carry it: `<option>` renders text and nothing else,
+   * so the list itself stays plain. A custom menu would fix that too.
+   */
+  const current = columns.find((column) => column.id === task.columnId);
 
   return (
     <Modal
-      open
+      open={open}
       onClose={dirty ? save : onClose}
+      onClosed={onClosed}
+      // Switching cards doesn't close the sheet, so this is the only chance to
+      // write what's in the form before it points somewhere else.
+      onCommit={() => {
+        if (dirty && draft.title.trim()) onSave(draft);
+      }}
       title={
-        <input
-          value={draft.title}
-          onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") save();
-          }}
-          className="w-full bg-transparent text-base font-semibold leading-snug text-ink outline-none placeholder:text-ink-ghost"
-          placeholder="Task title"
-        />
+        // The title is a bare input with no box, which reads as a heading rather
+        // than a field. The pencil is the only thing saying it can be typed in,
+        // and it turns accent once the caret is in it. Absolutely placed with room
+        // reserved by `pr-6`, since an input can't shrink to its text and a flex
+        // sibling would sit at the far end of the header instead.
+        <div className="group/title relative">
+          <input
+            value={draft.title}
+            onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") save();
+            }}
+            className="w-full bg-transparent pr-6 text-xl font-semibold leading-snug text-ink outline-none placeholder:text-ink-ghost"
+            placeholder="Task title"
+          />
+          <Pencil
+            aria-hidden
+            // `ink-faint` to match the close button beside it — `IconButton`'s
+            // resting tone — rather than the lighter `ink-ghost` a hint would
+            // usually take.
+            className="pointer-events-none absolute right-0 top-1/2 size-3 -translate-y-1/2 text-ink-faint transition-colors group-focus-within/title:text-accent"
+          />
+        </div>
       }
+      // The canvas' zoom, up beside the title. An empty element handed down for it
+      // to fill rather than a value passed up: the zoom changes on every event of a
+      // pinch, and holding it here would re-render the whole sheet at gesture rate.
+      // The canvas keeps the state and portals the number into this, so the cost
+      // stays where the state is.
+      aside={<span ref={setZoomSlot} />}
       footer={
         <>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={onArchive}>
-              <Archive className="size-3.5" /> Archive
-            </Button>
+          {/* Pulled out by the ghost buttons' own `px-2`. Their padding is
+              invisible, so without this their glyphs start eight points further in
+              than the header and body do — the fill on Save is what lets that side
+              align its box instead. */}
+          <div className="-ml-2 flex items-center gap-1">
+            {onMoveToBacklog && backlog && (
+              <Button variant="ghost" size="sm" onClick={onMoveToBacklog}>
+                <ColumnGlyph column={backlog} className="size-3.5" />
+                Move to {backlog.name.toLowerCase()}
+              </Button>
+            )}
             <Button
               variant="danger"
               size="sm"
@@ -135,7 +223,10 @@ export function TaskDialog({
               <Trash2 className="size-3.5" /> Delete
             </Button>
           </div>
-          <div className="flex items-center gap-2">
+          {/* Wider than the app's usual `gap-2`: the created date is a note about
+              the card and Save is an action on it, so they shouldn't read as a
+              pair the way the two buttons on the left do. */}
+          <div className="flex items-center gap-4">
             <span className="text-[11px] text-ink-faint">
               {dirty ? "Unsaved" : `Created ${format(task.createdAt, "MMM d")}`}
             </span>
@@ -146,67 +237,107 @@ export function TaskDialog({
         </>
       }
     >
-      <div className="space-y-5">
-        <div className="grid grid-cols-2 gap-3">
+      {/* Keyed by card, so a switch fades the new one in over 120ms rather than
+          cutting to it. Only the body: the header's title is an input the form
+          drives, and remounting it mid-edit would take the caret with it. */}
+      <div key={task.id} className="animate-fade-in space-y-5">
+        {/* Two-up even at this width: ~170px each, which the select and the date
+            field both hold. `min-w-0` on the cells so a long column name shrinks
+            its select rather than pushing the row wider than the sheet. */}
+        <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
           <label>
             <FieldLabel>Column</FieldLabel>
-            <select
-              value={task.columnId}
-              onChange={(e) => onMoveToColumn(e.target.value)}
-              className={SELECT}
-            >
-              {columns.map((column) => (
-                <option key={column.id} value={column.id}>
-                  {column.name}
-                </option>
-              ))}
-            </select>
+            <FieldShell>
+              {current && (
+                <ColumnGlyph
+                  column={current}
+                  className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+                />
+              )}
+              {/* `appearance-none` is what makes the padding above take: Safari
+                  lays out a native `menulist` select's text itself and ignores
+                  `padding-left`, which is why the glyph was sitting on top of the
+                  column name. Losing the appearance loses its chevron too, hence
+                  the one below — the same double arrow macOS draws on a popup
+                  button, so the control still reads as one. */}
+              <select
+                value={task.columnId}
+                onChange={(e) => onMoveToColumn(e.target.value)}
+                className={cn(
+                  FIELD,
+                  // `pl-9` puts ten points between the glyph and the name, which
+                  // is what the column's own header leaves: a 16px mark centred in
+                  // a 20px box, then `gap-1`, then the title's own `px-1`.
+                  "appearance-none pl-9 pr-7",
+                  // And the featured column's name is accent in its header, so it
+                  // is here too — the field should read as that column, not as a
+                  // neutral copy of its text.
+                  current?.isFocus && "text-accent",
+                )}
+              >
+                {columns.map((column) => (
+                  <option key={column.id} value={column.id}>
+                    {column.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronsUpDown
+                aria-hidden
+                className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-ink-faint"
+              />
+            </FieldShell>
           </label>
 
           <label>
             <FieldLabel>Due date</FieldLabel>
-            <Input
-              type="date"
-              value={toDateInputValue(draft.dueDate)}
-              onChange={(e) =>
-                setDraft((d) => ({
-                  ...d,
-                  dueDate: fromDateInputValue(e.target.value),
-                }))
-              }
-            />
+            <FieldShell>
+              <input
+                type="date"
+                value={toDateInputValue(draft.dueDate)}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    dueDate: fromDateInputValue(e.target.value),
+                  }))
+                }
+                className={FIELD}
+              />
+            </FieldShell>
           </label>
         </div>
 
         <div>
           <FieldLabel>Priority</FieldLabel>
-          <div
-                className="relative isolate flex gap-1 rounded-[var(--corner-control)] p-1"
-                style={
-                  { "--sq-radius": "var(--corner-control)" } as CSSProperties
-                }
-              >
-                <Plate
-                  face="var(--color-panel)"
-                  edge="var(--color-hairline)"
-                />
+          {/* The same pills the card wears, not a segmented control. Priority is a
+              pill everywhere else in the app — on the card, and in the dropdown
+              that pill opens — so a four-across bar with a sliding white segment
+              was the one place it looked like a different setting entirely. The
+              chosen one takes its own colour straight from `PRIORITY_STYLES.pill`,
+              which is the card's class, and the rest sit quiet in the same shape
+              as the context pills below. */}
+          <div className="flex flex-wrap items-center gap-1.5">
             {PRIORITIES.map((priority) => {
+              const on = draft.priority === priority;
               return (
                 <button
                   key={priority}
                   type="button"
                   onClick={() => setDraft((d) => ({ ...d, priority }))}
                   className={cn(
-                    "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors",
-                    draft.priority === priority
-                      ? cn(
-                          "bg-panel-raised shadow-sm shadow-shade/10",
-                          PRIORITY_STYLES[priority].chip,
-                        )
-                      : "text-ink-faint hover:bg-black/5",
+                    PILL,
+                    "transition-colors",
+                    on
+                      ? PRIORITY_STYLES[priority].pill
+                      : "bg-transparent text-ink-faint ring-hairline hover:text-ink",
                   )}
                 >
-                  <PriorityBars level={priority} className="size-3.5" />
+                  <PriorityBars
+                    level={priority}
+                    className={cn(
+                      "size-3.5",
+                      on ? PRIORITY_STYLES[priority].chip : "text-ink-ghost",
+                    )}
+                  />
                   {PRIORITY_STYLES[priority].label}
                 </button>
               );
@@ -233,7 +364,8 @@ export function TaskDialog({
                     }))
                   }
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset transition-colors",
+                    PILL,
+                    "transition-colors",
                     on
                       ? "bg-panel-raised text-ink ring-hairline-strong"
                       : "bg-transparent text-ink-faint ring-hairline hover:text-ink",
@@ -272,31 +404,30 @@ export function TaskDialog({
         </div>
 
         <div>
-          <FieldLabel>Labels</FieldLabel>
-          <LabelPicker
-            labels={labels}
-            selected={draft.labelIds}
-            onToggle={toggleLabel}
-            onCreate={async (name, color) => {
-              const created = await onCreateLabel(name, color);
-              if (created) toggleLabel(created.id);
-            }}
-          />
+          <FieldLabel>Notes</FieldLabel>
+          {/* Toolbar and editor share one box, the buttons along its top edge, so
+              they read as part of what they act on rather than as a strip floating
+              above it. `FieldShell` is the same surface the column and date fields
+              wear, which also gets this one the accent edge on focus. */}
+          <FieldShell radius="var(--corner-notes)">
+            <RichNotes
+              value={draft.description}
+              onChange={(description) => setDraft((d) => ({ ...d, description }))}
+              onSave={save}
+              placeholder="Take notes"
+            />
+          </FieldShell>
         </div>
 
         <div>
-          <FieldLabel>Notes</FieldLabel>
-          <Textarea
-            rows={6}
-            value={draft.description}
-            placeholder="Context, links, next steps…"
-            onChange={(e) =>
-              setDraft((d) => ({ ...d, description: e.target.value }))
-            }
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
-            }}
-          />
+          <FieldLabel>Visual canvas</FieldLabel>
+          {/* The notes box's surface and corner, since it's the same kind of
+              thing: a panel you put things into rather than a control. Its own
+              writes, too — a screenshot is saved when it's pasted, not when the
+              sheet's Save is pressed, so it isn't part of `draft`. */}
+          <FieldShell radius="var(--corner-notes)">
+            <VisualCanvas taskId={task.id} readout={zoomSlot} />
+          </FieldShell>
         </div>
       </div>
     </Modal>
@@ -308,6 +439,52 @@ export function TaskDialog({
  * than into the dialog's draft, because subtasks are their own rows — the Save
  * button covers the fields on the task itself.
  */
+/**
+ * The app's squircle, worn by a native control. The control keeps its own box for
+ * layout and focus and paints nothing; the plate behind it carries the fill, the
+ * hairline and the corner — the same split every other surface here uses, since a
+ * `border-radius` on a `<select>` can only ever be a circular one.
+ *
+ * The fill and edge are set as classes rather than through `face`/`edge`, which
+ * write inline custom properties that a `focus-within` variant couldn't override.
+ */
+function FieldShell({
+  children,
+  radius = "var(--corner-field)",
+}: {
+  children: ReactNode;
+  /** Overridden by the notes box, which is bigger and takes a rounder corner. */
+  radius?: string;
+}) {
+  return (
+    <div
+      // Just enough shadow to lift the white off the glass — these are the only
+      // opaque surfaces in the sheet, and without it they sat flat on it.
+      //
+      // A `box-shadow` on this unclipped root rather than a `drop-shadow` on the
+      // plate, which is the same call the task cards make: a filter would mean a
+      // repaint layer per field, and at a 10px radius the gap between the
+      // shadow's circular silhouette and the squircle over it vanishes under the
+      // blur. The `rounded-*` here shapes only the shadow.
+      // `rounded-[var(--sq-radius)]` so the one value below drives both the clip
+      // path's corner and the box-shadow's silhouette.
+      className="group relative isolate rounded-[var(--sq-radius)] shadow-[0_3px_12px_-2px] shadow-shade/[0.09]"
+      style={{ "--sq-radius": radius } as CSSProperties}
+    >
+      <Plate
+        surfaceClassName="[--sq-face:var(--color-panel-raised)] [--sq-edge:var(--color-hairline)] transition-colors group-focus-within:[--sq-edge:color-mix(in_oklab,var(--color-accent)_60%,transparent)]"
+      />
+      {/* One pixel of inset, which is the width of the plate's edge. The edge is
+          painted *behind* the content — that's the whole plate technique — so
+          anything reaching the field's perimeter covers it, and the focus ring is
+          the thing you'd least want covered. Static rather than `relative`, so the
+          glyph and chevron inside the two toggles still position against the shell.
+      */}
+      <div className="p-px">{children}</div>
+    </div>
+  );
+}
+
 function Subtasks({
   subtasks,
   onAdd,
@@ -395,80 +572,3 @@ function Subtasks({
   );
 }
 
-function LabelPicker({
-  labels,
-  selected,
-  onToggle,
-  onCreate,
-}: {
-  labels: ClientLabel[];
-  selected: string[];
-  onToggle: (labelId: string) => void;
-  onCreate: (name: string, color: string) => void;
-}) {
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState("");
-  // Cycle the palette so consecutive new labels don't all come out the same.
-  const [colorIndex, setColorIndex] = useState(labels.length);
-  const color = LABEL_COLOR_KEYS[colorIndex % LABEL_COLOR_KEYS.length];
-
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {labels.map((label) => {
-        const active = selected.includes(label.id);
-        return (
-          <button
-            key={label.id}
-            type="button"
-            onClick={() => onToggle(label.id)}
-            className={cn(
-              "rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset transition-all",
-              active
-                ? labelColor(label.color).chip
-                : "bg-transparent text-ink-faint ring-hairline hover:text-ink",
-            )}
-          >
-            {label.name}
-          </button>
-        );
-      })}
-
-      {creating ? (
-        <span className="flex items-center gap-1">
-          <button
-            type="button"
-            aria-label="Change colour"
-            onClick={() => setColorIndex((i) => i + 1)}
-            className={cn(
-              "size-5 rounded-full ring-2 ring-black/10",
-              labelColor(color).dot,
-            )}
-          />
-          <Input
-            autoFocus
-            value={name}
-            placeholder="Label name"
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && name.trim()) {
-                onCreate(name.trim(), color);
-                setName("");
-                setCreating(false);
-              }
-              if (e.key === "Escape") setCreating(false);
-            }}
-            className="h-7 w-32 text-xs"
-          />
-        </span>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-faint outline outline-1 outline-dashed -outline-offset-1 outline-hairline-strong transition-colors hover:text-ink"
-        >
-          <Plus className="size-3" /> <Tag className="size-3" />
-        </button>
-      )}
-    </div>
-  );
-}

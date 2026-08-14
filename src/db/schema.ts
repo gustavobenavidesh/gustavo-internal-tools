@@ -142,6 +142,51 @@ export const subtasks = sqliteTable(
   (t) => [index("subtasks_task_idx").on(t.taskId)],
 );
 
+/**
+ * Screenshots pasted onto a card's visual canvas — a Slack thread, a mock, a
+ * graph. Held as data URLs in the row rather than as files beside the database,
+ * because this app is one file you can copy: `npm run db:backup` is a
+ * `VACUUM INTO`, and anything kept outside the database would quietly stop being
+ * backed up. It costs a third in base64 and a heavier file, which for a personal
+ * board is the cheaper half of that trade.
+ *
+ * Never joined into `getBoardData` for the same reason — see `listAttachments`,
+ * which a card fetches only when it's opened. Pulling image bytes for every card
+ * on the board would make the first paint of the whole thing wait for them.
+ *
+ * `x`/`y` are where the image sits on the canvas, which pans in both directions —
+ * so they're unbounded, and negative on anything dragged up or left of where the
+ * view happened to start. `position` is only the stacking order.
+ */
+export const attachments = sqliteTable(
+  "attachments",
+  {
+    id: id(),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    /** `data:image/png;base64,…` — what the paste handler read off the clipboard. */
+    data: text("data").notNull(),
+    /** Natural size, which the canvas scales down from to lay the image out. */
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    x: real("x").notNull().default(0),
+    y: real("y").notNull().default(0),
+    /**
+     * How wide it's drawn on the canvas, in canvas units. Zero means "never
+     * resized" — the canvas then picks a sensible width from the natural size, so
+     * a screenshot doesn't arrive at its full retina width. Height is never stored:
+     * it follows from this and the natural aspect, which is what keeps a resize
+     * from ever squashing an image.
+     */
+    displayWidth: real("display_width").notNull().default(0),
+    /** Stacking order, and the order they were added in. */
+    position: real("position").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("attachments_task_idx").on(t.taskId)],
+);
+
 export const labels = sqliteTable(
   "labels",
   {
@@ -218,10 +263,15 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
   taskContexts: many(taskContexts),
   taskLabels: many(taskLabels),
   subtasks: many(subtasks),
+  attachments: many(attachments),
 }));
 
 export const subtasksRelations = relations(subtasks, ({ one }) => ({
   task: one(tasks, { fields: [subtasks.taskId], references: [tasks.id] }),
+}));
+
+export const attachmentsRelations = relations(attachments, ({ one }) => ({
+  task: one(tasks, { fields: [attachments.taskId], references: [tasks.id] }),
 }));
 
 export const labelsRelations = relations(labels, ({ one, many }) => ({
@@ -240,3 +290,4 @@ export type Task = typeof tasks.$inferSelect;
 export type Label = typeof labels.$inferSelect;
 export type Context = typeof contexts.$inferSelect;
 export type Subtask = typeof subtasks.$inferSelect;
+export type Attachment = typeof attachments.$inferSelect;

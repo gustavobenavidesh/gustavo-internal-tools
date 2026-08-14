@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { contextValues } from "@/db/queries";
 import {
   type Priority,
+  attachments,
   boards,
   columns,
   contexts,
@@ -500,6 +501,97 @@ export async function updateSubtask(
 
 export async function deleteSubtask(subtaskId: string) {
   db.delete(subtasks).where(eq(subtasks.id, subtaskId)).run();
+}
+
+// ------------------------------------------------------------- attachments
+
+/**
+ * The largest a pasted screenshot may be, as base64. Retina grabs of a long Slack
+ * thread run to a few megabytes; past this it's likelier a photo or a video frame
+ * dropped in by accident, and every one of these is read whenever its card is
+ * opened.
+ */
+const MAX_ATTACHMENT = 12 * 1024 * 1024;
+
+/**
+ * A card's canvas, fetched when the card is opened rather than with the board.
+ * These rows hold image bytes, so joining them into `getBoardData` would make the
+ * board's first paint wait on every screenshot it has ever been given.
+ */
+export async function listAttachments(taskId: string) {
+  return db
+    .select()
+    .from(attachments)
+    .where(eq(attachments.taskId, taskId))
+    .orderBy(asc(attachments.position))
+    .all();
+}
+
+export async function addAttachment(
+  taskId: string,
+  data: string,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+) {
+  if (!data.startsWith("data:image/")) {
+    throw new Error("Only images can go on the canvas");
+  }
+  if (data.length > MAX_ATTACHMENT) {
+    throw new Error("That image is too large for the canvas");
+  }
+
+  const last = db
+    .select({ value: max(attachments.position) })
+    .from(attachments)
+    .where(eq(attachments.taskId, taskId))
+    .get();
+
+  const [attachment] = db
+    .insert(attachments)
+    .values({
+      taskId,
+      data,
+      width,
+      height,
+      x,
+      y,
+      position: (last?.value ?? 0) + 1000,
+    })
+    .returning()
+    .all();
+  return attachment;
+}
+
+/**
+ * Where a dragged image came to rest. Unbounded on both axes: the canvas pans, so
+ * anything moved up or left of where the view started is simply negative.
+ */
+export async function moveAttachment(
+  attachmentId: string,
+  x: number,
+  y: number,
+) {
+  db.update(attachments)
+    .set({ x, y })
+    .where(eq(attachments.id, attachmentId))
+    .run();
+}
+
+/** How wide a resized image should be drawn, in canvas units. */
+export async function resizeAttachment(
+  attachmentId: string,
+  displayWidth: number,
+) {
+  db.update(attachments)
+    .set({ displayWidth: Math.max(40, displayWidth) })
+    .where(eq(attachments.id, attachmentId))
+    .run();
+}
+
+export async function deleteAttachment(attachmentId: string) {
+  db.delete(attachments).where(eq(attachments.id, attachmentId)).run();
 }
 
 // ---------------------------------------------------------------- contexts

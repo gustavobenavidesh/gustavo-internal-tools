@@ -54,9 +54,14 @@ export type Room = { hole: number | null; gap: number | null };
 
 /**
  * Reads those slots off the drag: where the card sits now, and where the drop
- * would put it. Returns null for a column with no part in the drag, and for the
- * column holding the card a fold-in is aimed at — nothing moves there, because
- * the card being aimed into is the one thing that mustn't.
+ * would put it. Null for a column with no part in the drag.
+ *
+ * Aiming *into* a card keeps whichever of its two slots leaves it standing still
+ * — the one on the same side as the hole, per the note above. Collapsing the room
+ * instead would be truer to the intent, since a fold-in inserts nothing, but the
+ * middle of a card sits between its two edges: every pass along a column would
+ * close the room and open it again, and that churn is far more distracting than a
+ * gap left open beside a card that's clearly lit up for something else.
  */
 export function roomInColumn({
   order,
@@ -70,12 +75,17 @@ export function roomInColumn({
 }): Room | null {
   const hole = draggingId ? indexOrNull(order, draggingId) : null;
   const at = target ? indexOrNull(order, target.id) : null;
-
-  if (at !== null && target?.where === "into") return null;
   if (hole === null && at === null) return null;
 
+  if (at === null) return { hole, gap: null };
+
+  // Below the card for a drop coming from above it, above it for one coming from
+  // below, and below for one arriving from another column — which has no hole to
+  // trade against, so pushing down from the slot under it is the only way to open
+  // room without shifting the card itself.
+  const near = hole === null || at < hole ? at + 1 : at;
   const gap =
-    at === null ? null : at + (target?.where === "below" ? 1 : 0);
+    target?.where === "into" ? near : at + (target?.where === "below" ? 1 : 0);
   return { hole, gap };
 }
 
