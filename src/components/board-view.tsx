@@ -197,19 +197,28 @@ export function BoardView({
   /**
    * Every mutation is applied locally first and persisted in the background.
    * If the server rejects it, re-fetch rather than trying to invert the edit.
+   *
+   * Resolves with whether the write actually landed. Nothing has to look — most
+   * callers still fire and forget, and the error banner is unchanged — but it
+   * means a caller holding something it can't afford to lose has a way to find
+   * out. The task sheet is the one that does: it keeps a copy of what you typed
+   * until this says the database has it.
    */
   const persist = useCallback(
-    (run: () => Promise<unknown>, message: string) => {
-      startTransition(async () => {
-        try {
-          await run();
-        } catch (cause) {
-          console.error(cause);
-          setError(message);
-          router.refresh();
-        }
-      });
-    },
+    (run: () => Promise<unknown>, message: string): Promise<boolean> =>
+      new Promise((resolve) => {
+        startTransition(async () => {
+          try {
+            await run();
+            resolve(true);
+          } catch (cause) {
+            console.error(cause);
+            setError(message);
+            router.refresh();
+            resolve(false);
+          }
+        });
+      }),
     [router],
   );
 
@@ -943,9 +952,10 @@ export function BoardView({
     );
   };
 
-  const saveTask = (taskId: string, patch: TaskPatch) => {
+  /** Resolves with whether the edit reached the database — see `persist`. */
+  const saveTask = (taskId: string, patch: TaskPatch): Promise<boolean> => {
     const task = live.current.tasks[taskId];
-    if (!task) return;
+    if (!task) return Promise.resolve(false);
 
     // Only the fields this save touched, so undoing it doesn't reach further
     // back than the edit did.
@@ -955,7 +965,7 @@ export function BoardView({
 
     record("your edits", () => saveTask(taskId, previous));
     dispatch({ type: "task/patch", taskId, patch });
-    persist(
+    return persist(
       () => actions.updateTask(taskId, patch),
       "Couldn't save your changes",
     );

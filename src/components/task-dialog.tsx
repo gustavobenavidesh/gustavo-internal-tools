@@ -19,6 +19,7 @@ import {
   Plate,
 } from "@/components/ui";
 import { PRIORITY_STYLES, labelColor } from "@/lib/colors";
+import { type Draft, clearDraft, readDraft, writeDraft } from "@/lib/drafts";
 import { ColumnGlyph } from "@/components/column-glyph";
 import { RichNotes } from "@/components/rich-notes";
 import { VisualCanvas } from "@/components/visual-canvas";
@@ -56,7 +57,8 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onClosed: () => void;
-  onSave: (patch: TaskPatch) => void;
+  /** Resolves with whether the write landed, which is what clears the draft. */
+  onSave: (patch: TaskPatch) => Promise<boolean> | void;
   onMoveToColumn: (columnId: string) => void;
   /**
    * Files the card in the board's parking lot. Absent when there's no muted
@@ -136,8 +138,69 @@ export function TaskDialog({
     }
   });
 
+  /**
+   * What's been typed, kept on the device until the server says it has it.
+   *
+   * Written on every edit and cleared only by a confirmed write, so whatever
+   * survives is by definition something the database never received. See
+   * `src/lib/drafts.ts` for why that's worth the keystrokes.
+   *
+   * Only while it differs from the card: a draft equal to what's stored is not an
+   * unsaved edit, and leaving one behind would offer the user their own saved
+   * words back every time they opened the sheet.
+   */
+  const [orphan, setOrphan] = useState<Draft | null>(null);
+
+  /**
+   * Reading what a card left behind and mirroring what's being typed into it are
+   * the same effect on purpose, because the order matters and two effects can only
+   * get it wrong. A sheet opens un-dirty, so a mirror running on its own would
+   * clear the copy on the way in — deleting the very thing it exists to keep, a
+   * frame before anything could offer it back. The first pass for a card only ever
+   * reads.
+   *
+   * What it finds is offered rather than applied. It's the older text by
+   * definition — the card has moved on without it — so restoring is a decision,
+   * and taking it silently would overwrite whatever has been typed since.
+   *
+   * Nothing here ever deletes. Only a confirmed write does, in `commit`, and only
+   * Discard does on purpose. That looks over-cautious and isn't: the board saves
+   * optimistically, so pressing Save patches local state and makes the form clean
+   * *before* the server has said anything. A copy cleared on "no longer dirty" is
+   * therefore cleared a beat before the write fails — which is precisely the case
+   * it exists for, and precisely how this lost the notes it was written to save.
+   * A draft that matches the card is harmless; it's filtered out of the offer.
+   */
+  const checked = useRef<string | null>(null);
+  useEffect(() => {
+    if (checked.current !== task.id) {
+      checked.current = task.id;
+      const stored = readDraft(task.id);
+      setOrphan(stored && !same(stored.patch, asPatch(task)) ? stored : null);
+      return;
+    }
+    if (dirty) writeDraft(task.id, draft);
+  }, [dirty, draft, task]);
+
+  /** A write that didn't land, said plainly and left there until one does. */
+  const [unsaved, setUnsaved] = useState(false);
+
+  /**
+   * Hands the edit up and waits to hear whether it landed. The draft is cleared
+   * only by a yes — the sheet is usually gone by the time this resolves, which is
+   * fine, because the copy on the device outlives it and is offered back the next
+   * time the card is opened.
+   */
+  const commit = (patch: TaskPatch) => {
+    if (!patch.title.trim()) return;
+    void Promise.resolve(onSave(patch)).then((landed) => {
+      if (landed) clearDraft(task.id);
+      setUnsaved(!landed);
+    });
+  };
+
   const save = () => {
-    if (draft.title.trim()) onSave(draft);
+    commit(draft);
     onClose();
   };
 
@@ -167,7 +230,7 @@ export function TaskDialog({
       // Switching cards doesn't close the sheet, so this is the only chance to
       // write what's in the form before it points somewhere else.
       onCommit={() => {
-        if (dirty && draft.title.trim()) onSave(draft);
+        if (dirty) commit(draft);
       }}
       title={
         // The title is a bare input with no box, which reads as a heading rather
@@ -221,8 +284,20 @@ export function TaskDialog({
               the card and Save is an action on it, so they shouldn't read as a
               pair the way the two buttons on the left do. */}
           <div className="flex items-center gap-4">
-            <span className="text-[11px] text-ink-faint">
-              {dirty ? "Unsaved" : `Created ${format(task.createdAt, "MMM d")}`}
+            {/* A failed write outranks both of the others and stays put until one
+                succeeds. The reassurance is the second line: the reason this can be
+                stated calmly is that the words aren't gone. */}
+            <span
+              className={cn(
+                "text-[11px]",
+                unsaved ? "font-medium text-rose-700" : "text-ink-faint",
+              )}
+            >
+              {unsaved
+                ? "Not saved — kept on this device"
+                : dirty
+                  ? "Unsaved"
+                  : `Created ${format(task.createdAt, "MMM d")}`}
             </span>
             <Button variant="primary" size="sm" onClick={save}>
               Save
@@ -235,6 +310,39 @@ export function TaskDialog({
           cutting to it. Only the body: the header's title is an input the form
           drives, and remounting it mid-edit would take the caret with it. */}
       <div key={task.id} className="animate-fade-in space-y-5">
+        {/* Edits this card never managed to store, offered back at the top of the
+            sheet where they can't be missed. Restoring only fills the form — it
+            still takes a Save, so the recovery goes through the same path every
+            other edit does and can be looked at first. */}
+        {orphan && (
+          <div className="flex items-center gap-3 rounded-[var(--corner-field)] bg-amber-50 px-3 py-2 text-[12px] text-amber-900 ring-1 ring-inset ring-amber-200">
+            <span className="min-w-0 flex-1">
+              Unsaved edits from {format(orphan.at, "MMM d, h:mm a")} were never
+              stored.
+            </span>
+            <button
+              type="button"
+              className="shrink-0 font-medium underline underline-offset-2"
+              onClick={() => {
+                setDraft(orphan.patch);
+                setOrphan(null);
+              }}
+            >
+              Restore
+            </button>
+            <button
+              type="button"
+              className="shrink-0 text-amber-700/70 hover:text-amber-900"
+              onClick={() => {
+                clearDraft(task.id);
+                setOrphan(null);
+              }}
+            >
+              Discard
+            </button>
+          </div>
+        )}
+
         {/* Two-up even at this width: ~170px each, which the select and the date
             field both hold. `min-w-0` on the cells so a long column name shrinks
             its select rather than pushing the row wider than the sheet. */}
