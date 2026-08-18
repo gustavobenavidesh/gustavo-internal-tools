@@ -629,8 +629,17 @@ export const PILL =
  * what `black/5` and its ring already computed to on white, to a couple of
  * points, so nothing moves where it was already right.
  */
+/**
+ * The half pixel in the padding is the letter sitting low in its own line box.
+ * `leading-none` makes the box the font's size, but a capital only fills the part
+ * of it between the baseline and the cap height — the descender space below stays
+ * empty, so splitting the padding evenly centres the *box* and leaves the glyph
+ * riding high in it. Four and a half above against three and a half below puts it
+ * back, at the same overall height, which is why it's written as a pair rather
+ * than as a nudge.
+ */
 export const KBD =
-  "rounded-md bg-panel px-1.5 py-1 text-[10px] font-medium leading-none text-ink-faint ring-1 ring-inset ring-hairline";
+  "rounded-md bg-panel px-1.5 pb-[3.5px] pt-[4.5px] text-[10px] font-medium leading-none text-ink-faint ring-1 ring-inset ring-hairline";
 
 export const MENU_ITEM =
   "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink transition-colors hover:bg-black/5";

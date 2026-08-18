@@ -107,13 +107,26 @@ export function BoardHeader({
               <X className="size-3.5" />
             </IconButton>
           ) : (
-            /* The shared cap, untouched — the same chip as the one on the New
-               task button, which is the point: two keys for two shortcuts should
-               look like the same kind of thing wherever they sit. */
+            /* The shared cap's shape and type, in this field's own colours. It used
+               to be the chip verbatim, on the principle that two keys for two
+               shortcuts should look like the same kind of thing — but that was
+               written while this field was a light well. Inverted, the opaque light
+               chip became the brightest thing in the header, a white tile floating
+               on a grey pill.
+
+               So it follows its surface rather than its twin: set *into* the fill
+               rather than lifted off it, which is the right way round for a key —
+               and the way that keeps it from competing with the placeholder for
+               attention. Its glyph is a step under the white beside it for the same
+               reason, and the ring comes off entirely: an edge is what holds a
+               light chip against a light surface, and here the fill is doing that
+               job on its own. A shape and a size hold the two caps together well
+               enough without the fill having to match across two opposite
+               surfaces. */
             <kbd
               className={cn(
                 KBD,
-                "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2",
+                "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 bg-shade/25 text-white/80 ring-0",
               )}
             >
               S
