@@ -271,7 +271,9 @@ function FactOfTheDay({ fact }: { fact: HistoryFact }) {
             is #232325, which at these alphas reads perceptibly lighter. A step up
             from the original 3%, since the smoothed corner gives the card less
             edge to hold it apart from the sidebar. */}
-        <Plate face="color-mix(in oklab, #000 4%, transparent)" />
+        {/* A token, not a black wash: black over a dark canvas is nothing, and
+            this card went invisible in the dark theme. */}
+        <Plate face="var(--color-tint-card)" />
         <p className="flex items-center gap-1.5 text-[10px] font-medium text-ink-faint">
           <ScrollText className="size-3" />
           Historic fact

@@ -115,6 +115,18 @@
   --color-tint: rgb(0 0 0 / 0.05);
   --color-tint-soft: rgb(0 0 0 / 0.03);
 
+  /* The sidebar's fact card, which asks only to be a different patch of paper from
+     the canvas it sits on. It darkens on a light surface and lifts on a dark one,
+     which is the same direction the hover tints take and for the same reason: a
+     wash has to move away from what's under it to be seen at all.
+
+     The size of the lift is the whole difficulty in the dark. Too little and the
+     card vanishes into the canvas; too much and it arrives at a task card's fill
+     and starts reading as something you could pick up, which is the wrong thing to
+     say about an aside. It wants to sit nearer the canvas than the card: eight
+     points above a canvas of nineteen, against a task card at forty-two. */
+  --color-tint-card: rgb(0 0 0 / 0.04);
+
   /* The search field, which is the app's one deliberately inverted surface: a
      dark pill on a light canvas, with white inside it. That trick is only
      available while everything around it is light — on a dark canvas a dark pill
@@ -262,6 +274,7 @@
      white. */
   --color-tint: rgb(255 255 255 / 0.07);
   --color-tint-soft: rgb(255 255 255 / 0.04);
+  --color-tint-card: rgb(255 255 255 / 0.035);
 
   /* No longer inverted — see the light values. A well lifted off the canvas,
      with the app's own ink in it rather than white. */
