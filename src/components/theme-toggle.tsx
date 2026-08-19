@@ -1,39 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { THEME_KEY, TITLE_BAR, type Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-
-export type Theme = "light" | "dark";
-
-export const THEME_KEY = "board:theme";
 
 /**
  * Light or dark, and nothing else — no system option on purpose. Following the OS
  * means the board changes underneath you when the sun goes down or a meeting room
  * dims the laptop, and a board is a thing you look at all day and form a picture
  * of. One switch, one answer, remembered.
+ *
+ * Repaints the title bar with the board, since on an installed app the two are
+ * the same window — see `TITLE_BAR`.
  */
 export function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", theme === "dark");
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute("content", TITLE_BAR[theme]);
   try {
     window.localStorage.setItem(THEME_KEY, theme);
   } catch {}
 }
-
-/**
- * The script that runs before the first paint, inlined into the document head.
- *
- * Without it the page renders light, then corrects itself once React has
- * hydrated — a white flash on every load, which is worse in the dark theme than
- * having no dark theme at all. It's a string because it has to be in the HTML
- * itself: anything imported arrives too late to matter.
- *
- * It reads the same key `applyTheme` writes and sets the same class, and it's
- * wrapped because `localStorage` throws rather than returning null in a few
- * cases — a board that failed to open is a worse outcome than one that opened
- * light.
- */
-export const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("${THEME_KEY}");if(t==="dark")document.documentElement.classList.add("dark")}catch(e){}})()`;
 
 /**
  * One glyph that turns into the other, rather than two that swap.

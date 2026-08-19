@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { THEME_SCRIPT } from "@/components/theme-toggle";
+import { THEME_SCRIPT, TITLE_BAR } from "@/lib/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -53,6 +53,23 @@ export default function RootLayout({
             Here rather than in a `<head>` of its own: writing that element by hand
             fights the one the App Router builds, and the two disagreeing is a
             hydration mismatch on every page load. */}
+        {/* The tag the script below and the toggle repaint, which is what makes
+            the installed window's title bar follow the theme — Safari tints it
+            from `theme-color`, and the manifest's copy is fixed at install time.
+
+            Rendered here and hoisted into `<head>` by React rather than declared
+            through the `viewport` export: that export is the documented way and it
+            emits nothing until the dev server is restarted, and restarting it
+            strands the installed app on chunks that no longer exist. A `<meta>` is
+            one of the tags React lifts out of the tree wherever it finds it.
+
+            `suppressHydrationWarning` because the script is about to rewrite this
+            element's `content` before React ever looks at it. */}
+        <meta
+          name="theme-color"
+          content={TITLE_BAR.light}
+          suppressHydrationWarning
+        />
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         {children}
       </body>
