@@ -103,12 +103,12 @@ const VARIANTS: Record<
   ghost: {
     root: "text-ink-soft hover:text-ink",
     surface:
-      "group-hover:[--sq-face:color-mix(in_oklab,#000_5%,transparent)]",
+      "group-hover:[--sq-face:var(--color-tint)]",
   },
   danger: {
-    root: "text-rose-700 hover:text-rose-800",
+    root: "text-danger hover:text-danger-strong",
     surface:
-      "group-hover:[--sq-face:color-mix(in_oklab,var(--color-rose-500)_10%,transparent)]",
+      "group-hover:[--sq-face:var(--color-danger-face)]",
   },
 };
 
@@ -150,7 +150,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={cn(
-        "grid size-7 shrink-0 place-items-center rounded-md text-ink-faint transition-colors hover:bg-black/5 hover:text-ink",
+        "grid size-7 shrink-0 place-items-center rounded-md text-ink-faint transition-colors hover:bg-tint hover:text-ink",
         className,
       )}
       {...props}
@@ -426,7 +426,7 @@ export function Modal({
             layer="z-0"
             face="color-mix(in oklab, var(--color-panel-raised) 62%, transparent)"
             edge="color-mix(in oklab, var(--color-ink) 14%, transparent)"
-            surfaceClassName="backdrop-blur-[14px] backdrop-saturate-[0.9] backdrop-brightness-[1.08]"
+            surfaceClassName="backdrop-blur-[14px] backdrop-saturate-[0.9] backdrop-brightness-[var(--glass-brightness)]"
           />
 
           {/* Its left edge is the resize handle — the sheet is pinned to the right,
@@ -591,15 +591,15 @@ export function Toast({
         // depth it would paint over this — and "close the card first to undo" is
         // a message you only see while a card is open.
         "fixed bottom-4 left-1/2 isolate z-[60] -translate-x-1/2 animate-pop-in rounded-[var(--corner-chip)] text-xs shadow-lg shadow-shade/8",
-        error ? "text-rose-900" : "text-ink-soft",
+        error ? "text-danger-strong" : "text-ink-soft",
       )}
       style={{ "--sq-radius": "var(--corner-chip)" } as CSSProperties}
     >
       <Plate
-        face={error ? "var(--color-rose-50)" : "var(--color-panel-raised)"}
+        face={error ? "var(--color-danger-face)" : "var(--color-panel-raised)"}
         edge={
           error
-            ? "color-mix(in oklab, var(--color-rose-600) 25%, transparent)"
+            ? "color-mix(in oklab, var(--color-danger) 45%, transparent)"
             : "var(--color-hairline-strong)"
         }
       />
@@ -642,7 +642,7 @@ export const KBD =
   "rounded-md bg-panel px-1.5 pb-[3.5px] pt-[4.5px] text-[10px] font-medium leading-none text-ink-faint ring-1 ring-inset ring-hairline";
 
 export const MENU_ITEM =
-  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink transition-colors hover:bg-black/5";
+  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink transition-colors hover:bg-tint";
 
 /** Click-outside + Escape dismissal for header popovers. */
 export function useDismiss(open: boolean, onClose: () => void) {

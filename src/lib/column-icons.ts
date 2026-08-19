@@ -46,5 +46,5 @@ export function columnIconTone(column: {
   name: string;
   isDone: ClientColumn["isDone"];
 }): string | undefined {
-  return column.isDone ? "text-emerald-600" : undefined;
+  return column.isDone ? "text-success" : undefined;
 }

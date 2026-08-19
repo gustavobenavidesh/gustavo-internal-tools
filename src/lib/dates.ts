@@ -18,8 +18,8 @@ export function formatDue(timestamp: number) {
 }
 
 export const DUE_TONES = {
-  overdue: "text-rose-800 bg-rose-500/12 ring-rose-600/20",
-  today: "text-amber-800 bg-amber-500/18 ring-amber-700/20",
+  overdue: "text-danger bg-danger-face ring-danger/25",
+  today: "text-warn-ink bg-warn-edge/40 ring-warn-edge",
   soon: "text-ink-soft bg-canvas ring-hairline",
   later: "text-ink-faint bg-canvas ring-hairline",
 } as const;

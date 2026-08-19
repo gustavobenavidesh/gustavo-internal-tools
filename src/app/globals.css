@@ -1,6 +1,16 @@
 @import "tailwindcss";
 
 /**
+ * The dark theme is a class on `<html>`, not the OS preference — the board is a
+ * thing you choose, and following the system would change it under you when the
+ * sun goes down. This teaches Tailwind's `dark:` variant to look for that class,
+ * which is needed only where a colour can't be a token: the label and priority
+ * palettes are written out literally, one class string per hue, because Tailwind
+ * only ships classes it can find in the source.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/**
  * Die Grotesk is a licensed face installed on this machine, not a webfont, so
  * it's pulled in with `local()`. Each weight is declared separately because the
  * OTFs ship as separate families ("Die Grotesk A Medium"), which the browser
@@ -95,6 +105,44 @@
   --color-accent-ink: #0063d1;
   --color-accent-soft: #9dcaff;
 
+  /* The wash under a hover or an active row. It was `black/5` written out at
+     thirteen call sites, which is fine until the app has to work on a dark
+     canvas — there, black over black is nothing at all, and every one of those
+     rows stops responding to the pointer. A token because the *direction* has to
+     flip with the theme, not just the value: light surfaces are darkened, dark
+     ones are lifted. The alpha is baked in rather than left to a `/5` modifier,
+     so the two themes can disagree about how much is enough. */
+  --color-tint: rgb(0 0 0 / 0.05);
+  --color-tint-soft: rgb(0 0 0 / 0.03);
+
+  /* The search field, which is the app's one deliberately inverted surface: a
+     dark pill on a light canvas, with white inside it. That trick is only
+     available while everything around it is light — on a dark canvas a dark pill
+     is a hole — so in the dark theme it stops being inverted and becomes a lifted
+     well like any other. Its own tokens because nothing else in the app is built
+     this way, and because the cap and the glyphs inside have to move with it. */
+  --color-well: rgb(35 35 37 / 0.4);
+  --color-well-hover: rgb(35 35 37 / 0.5);
+  --color-well-ink: #ffffff;
+  --color-well-cap: rgb(35 35 37 / 0.25);
+
+  /* Delete, and the one destructive confirm. Rose reads at 700 on white and has
+     to come up several steps to read on near-black — a token, so the components
+     stop naming a number that's only right in one theme. */
+  --color-danger: #be123c;
+  --color-danger-strong: #9f1239;
+  --color-danger-face: rgb(244 63 94 / 0.1);
+
+  /* The done tick, and the ring around a finished card. */
+  --color-success: #059669;
+
+  /* The unsaved-draft notice — a surface, an edge and two weights of text on it,
+     which is more than a single hue can carry across both themes. */
+  --color-warn-face: #fffbeb;
+  --color-warn-edge: #fde68a;
+  --color-warn-ink: #78350f;
+  --color-warn-ink-soft: rgb(180 83 9 / 0.7);
+
   /* Geist stays as the fallback for anywhere Die Grotesk isn't installed. */
   --font-sans:
     "Die Grotesk", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
@@ -150,6 +198,98 @@
      at this size that's what it reads as. */
   --corner-notes: 20px;
   --corner-chip: 11px;
+
+  /* The glass sheet lifts what's behind it towards white. In the dark theme it
+     has to do the opposite, so the amount is a variable rather than a number in
+     a utility class. */
+  --glass-brightness: 1.08;
+}
+
+/**
+ * The dark theme. Everything above is a token and every surface in the app is
+ * painted from one, so this is a palette swap rather than a second stylesheet —
+ * no `dark:` variants anywhere in the components, and no chance of the two
+ * drifting as things are built. The class goes on `<html>`, set before first
+ * paint by the script in `layout.tsx`.
+ *
+ * The light palette's surfaces step lightest-in-the-middle: the canvas holds the
+ * sidebar, the board card sits *lighter* on top of it, columns recede inside
+ * that card, and only task cards are pure white. That ordering is the app's
+ * shape, so it's kept rather than mirrored — the same steps, walked in the dark:
+ * the canvas is the darkest thing, the board card lifts off it, the featured
+ * column drops below it, and a task card is the lightest surface on screen.
+ *
+ * The greys are neutral — every value has its three channels equal. The light
+ * palette carries a couple of points of red over blue, which reads as warmth on
+ * a near-white surface and as a cast on a near-black one: the same delta that
+ * makes paper look like paper makes black look tinted, and the eye finds it
+ * immediately on a large dark field. So this side of the app is on a straight
+ * black-to-white scale, and the only colour in it is colour that means something
+ * — the accent, the done wash, a warning.
+ */
+.dark {
+  --color-canvas: #131313;
+  --color-surface: #1c1c1c;
+  --color-panel: #181818;
+  --color-panel-raised: #232323;
+  --color-panel-sunk: #0d0d0d;
+  --color-hairline: #2a2a2a;
+  --color-hairline-strong: #3d3d3d;
+  --color-hairline-mid: #313131;
+
+  /* Not pure white at the top: #fff on near-black glares and makes the type look
+     heavier than the same words look in the light theme. */
+  --color-ink: #ededed;
+  --color-ink-soft: #b0b0b0;
+  --color-ink-faint: #8a8a8a;
+  --color-ink-ghost: #646464;
+
+  /* Shadows go black rather than ink-tinted. The light theme tints them with the
+     ink because black goes grey and dead on a warm white; on a dark canvas the
+     opposite is true — anything lighter than black stops reading as shadow. */
+  --color-shade: #000000;
+
+  --color-done: #14231b;
+
+  /* The accent holds, but its *text* step has to invert: `accent-ink` is darker
+     than the fill on white and has to be lighter than it on black. */
+  --color-accent: #0a84ff;
+  --color-accent-ink: #63b0ff;
+  --color-accent-soft: #1f4d7a;
+
+  /* Lifted rather than darkened, and further than the light theme darkens: an
+     equal step of white on black is a smaller apparent change than black on
+     white. */
+  --color-tint: rgb(255 255 255 / 0.07);
+  --color-tint-soft: rgb(255 255 255 / 0.04);
+
+  /* No longer inverted — see the light values. A well lifted off the canvas,
+     with the app's own ink in it rather than white. */
+  --color-well: rgb(255 255 255 / 0.07);
+  --color-well-hover: rgb(255 255 255 / 0.11);
+  --color-well-ink: #ededed;
+  --color-well-cap: rgb(0 0 0 / 0.35);
+
+  --color-danger: #fb7185;
+  --color-danger-strong: #fda4af;
+  --color-danger-face: rgb(244 63 94 / 0.16);
+
+  --color-success: #34d399;
+
+  --color-warn-face: #2a2113;
+  --color-warn-edge: #4d3a17;
+  --color-warn-ink: #fcd34d;
+  --color-warn-ink-soft: rgb(252 211 77 / 0.7);
+
+  /* No grain at all. It's a paper texture, and paper is a light-theme idea — on
+     black the same dust reads as sensor noise or a bad gradient rather than as a
+     surface. Zero rather than removed, because the page background, the
+     `paper-grain` utility and the squircle plates all take their strength from
+     this one variable, so turning it off here turns it off everywhere. */
+  --grain-opacity: 0;
+
+  /* And the glass darkens what's behind it instead of lifting it. */
+  --glass-brightness: 0.85;
 }
 
 html,

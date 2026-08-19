@@ -296,7 +296,7 @@ export function TaskCardBody({
                 : overlay
                   ? "[--sq-edge:color-mix(in_oklab,var(--color-accent)_50%,transparent)] [--sq-face:var(--color-panel-raised)]"
                   : done
-                    ? "[--sq-edge:color-mix(in_oklab,var(--color-emerald-600)_15%,transparent)] [--sq-face:var(--color-done)] group-hover:[--sq-edge:color-mix(in_oklab,var(--color-emerald-600)_25%,transparent)]"
+                    ? "[--sq-edge:color-mix(in_oklab,var(--color-success)_15%,transparent)] [--sq-face:var(--color-done)] group-hover:[--sq-edge:color-mix(in_oklab,var(--color-success)_25%,transparent)]"
                     : "[--sq-edge:var(--color-hairline)] [--sq-face:var(--color-panel-raised)] group-hover:[--sq-edge:var(--color-hairline-strong)]",
             )}
           />
@@ -363,7 +363,7 @@ export function TaskCardBody({
             // is a ratio to the glyph, not a fixed width: 2.75 across 14 points read
             // as emphasis, and the same stroke across 12 reads as a thicker mark
             // than the one it replaced, which is the opposite of smaller.
-            className="mt-[5px] size-2.5 shrink-0 text-emerald-600"
+            className="mt-[5px] size-2.5 shrink-0 text-success"
             strokeWidth={2.25}
             aria-label="Done"
           />
@@ -394,7 +394,7 @@ export function TaskCardBody({
                       : "ring-hairline-strong group-hover/sub:ring-ink-ghost",
                   )}
                 >
-                  {sub.done && <Check className="size-2.5 text-white" />}
+                  {sub.done && <Check className="size-2.5 text-canvas" />}
                 </span>
                 <span
                   className={cn(
@@ -434,7 +434,7 @@ export function TaskCardBody({
                 done
                   ? // White, not the canvas tone: on the green fill of a
                     // finished card the grey pill all but disappears.
-                    "bg-panel-raised text-ink-soft ring-emerald-600/15"
+                    "bg-panel-raised text-ink-soft ring-success/15"
                   : "bg-canvas text-ink-soft ring-hairline",
                 docked && "pr-2.5",
               )}
@@ -470,7 +470,7 @@ export function TaskCardBody({
               className={cn(
                 "-ml-[7px] w-6 justify-center px-0",
                 done
-                  ? "bg-panel-raised text-ink-faint ring-emerald-600/15 hover:text-ink-soft"
+                  ? "bg-panel-raised text-ink-faint ring-success/15 hover:text-ink-soft"
                   : "bg-canvas text-ink-faint ring-hairline hover:text-ink-soft",
               )}
               style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}
@@ -555,7 +555,7 @@ export function TaskCardBody({
             ]
               .filter(Boolean)
               .join(" — ")}
-            className="inline-flex min-w-0 items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-black/5 hover:text-ink-soft"
+            className="inline-flex min-w-0 items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-tint hover:text-ink-soft"
           >
             <SlackMark className="size-3 shrink-0" />
             {task.source.channel && (

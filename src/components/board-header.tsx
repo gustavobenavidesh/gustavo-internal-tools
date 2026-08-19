@@ -5,6 +5,7 @@ import {
   type CSSProperties, type RefObject, useState
 } from "react";
 import { FilterKnobs } from "@/components/filter-knobs";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button, IconButton, Input, KBD, Plate, useDismiss } from "@/components/ui";
 import { PRIORITIES, type Priority } from "@/db/schema";
 import { PRIORITY_STYLES, labelColor } from "@/lib/colors";
@@ -63,7 +64,7 @@ export function BoardHeader({
               is the widest thing in the toolbar and can't be much narrower and
               still be a search field, so what makes it recede is the type inside
               it rather than the box. */}
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-3.5 -translate-y-1/2 text-white" />
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-3.5 -translate-y-1/2 text-well-ink" />
           {/* The one control in the app that cuts *into* its background rather
               than sitting on it: everywhere else an input is `panel-raised`, but
               those are inside a panel, and this one is out on the bare canvas
@@ -94,7 +95,7 @@ export function BoardHeader({
             // Hover deepens, which on this one *raises* contrast against the
             // white inside it — the opposite of what it did while the fill was
             // light, and the reason the two numbers swapped places.
-            className="h-8 w-[22rem] rounded-full bg-shade/[0.4] pl-[34px] pr-8 text-[13px] text-white ring-transparent transition-colors hover:bg-shade/[0.5] hover:ring-transparent placeholder:text-white"
+            className="h-8 w-[22rem] rounded-full bg-well pl-[34px] pr-8 text-[13px] text-well-ink ring-transparent transition-colors hover:bg-well-hover hover:ring-transparent placeholder:text-well-ink"
           />
           {filters.query ? (
             <IconButton
@@ -102,7 +103,7 @@ export function BoardHeader({
               onClick={() => onFiltersChange({ ...filters, query: "" })}
               // Takes the key cap's place, so it lights the same way rather than
               // darkening into the well the way the shared button does.
-              className="absolute right-1 top-1/2 size-7 -translate-y-1/2 rounded-full text-white hover:bg-white/20 hover:text-white"
+              className="absolute right-1 top-1/2 size-7 -translate-y-1/2 rounded-full text-well-ink hover:bg-well-cap hover:text-well-ink"
             >
               <X className="size-3.5" />
             </IconButton>
@@ -126,7 +127,7 @@ export function BoardHeader({
             <kbd
               className={cn(
                 KBD,
-                "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 bg-shade/25 text-white/80 ring-0",
+                "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 bg-well-cap text-well-ink/80 ring-0",
               )}
             >
               S
@@ -146,10 +147,11 @@ export function BoardHeader({
         <button
           type="button"
           onClick={onAddColumn}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink-faint transition-colors hover:bg-black/5 hover:text-ink-soft"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink-faint transition-colors hover:bg-tint hover:text-ink-soft"
         >
           <Plus className="size-3.5" /> Column
         </button>
+        <ThemeToggle />
       </div>
     </header>
   );

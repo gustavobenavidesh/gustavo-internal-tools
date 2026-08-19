@@ -590,7 +590,7 @@ export function VisualCanvas({
                   // Counter-scaled, like the grip below it: the canvas is a transform
                   // now, so a control left alone would grow and shrink with the
                   // picture it belongs to.
-                  className="absolute right-1.5 top-1.5 size-6 origin-top-right [scale:calc(1/var(--z))] bg-panel-raised/90 opacity-0 shadow-sm shadow-shade/20 transition-opacity hover:text-rose-700 group-hover/shot:opacity-100"
+                  className="absolute right-1.5 top-1.5 size-6 origin-top-right [scale:calc(1/var(--z))] bg-panel-raised/90 opacity-0 shadow-sm shadow-shade/20 transition-opacity hover:text-danger group-hover/shot:opacity-100"
                 >
                   <Trash2 className="size-3" />
                 </IconButton>
@@ -665,7 +665,7 @@ export function VisualCanvas({
       )}
 
       {error && (
-        <p className="px-3 pb-2 text-center text-[11px] text-rose-700">
+        <p className="px-3 pb-2 text-center text-[11px] text-danger">
           {error}
         </p>
       )}

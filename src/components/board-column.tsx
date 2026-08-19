@@ -231,7 +231,7 @@ export function BoardColumn({
             type="button"
             onClick={() => setRenaming(true)}
             className={cn(
-              "min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-semibold hover:bg-black/5",
+              "min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-semibold hover:bg-tint",
               column.isFocus
                 ? "text-sm text-accent"
                 : "text-[13px] text-ink-soft",
@@ -245,7 +245,7 @@ export function BoardColumn({
         <span
           className={cn(
             "rounded px-1.5 py-0.5 font-mono text-[11px] tabular-nums",
-            overLimit ? "bg-amber-500/20 text-amber-800" : "text-ink-faint",
+            overLimit ? "bg-warn-edge/40 text-warn-ink" : "text-ink-faint",
           )}
           title={
             column.wipLimit !== null
@@ -336,7 +336,7 @@ export function BoardColumn({
           <button
             type="button"
             onClick={() => onComposingChange(true)}
-            className="flex w-full items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium text-ink-faint transition-colors hover:bg-black/5 hover:text-ink-soft"
+            className="flex w-full items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium text-ink-faint transition-colors hover:bg-tint hover:text-ink-soft"
           >
             <Plus className="size-3.5" /> Add task
           </button>
@@ -479,7 +479,7 @@ function ColumnMenu({
   );
 
   const item =
-    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink transition-colors hover:bg-black/5 disabled:opacity-40";
+    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-ink transition-colors hover:bg-tint disabled:opacity-40";
 
   return (
     <div
@@ -558,7 +558,7 @@ function ColumnMenu({
 
       <button
         type="button"
-        className={cn(item, "text-rose-700 hover:bg-rose-500/10")}
+        className={cn(item, "text-danger hover:bg-danger-face")}
         onClick={() => {
           if (
             taskCount === 0 ||

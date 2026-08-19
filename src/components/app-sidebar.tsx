@@ -379,7 +379,7 @@ function SidebarRow({
     <div
       className={cn(
         "group flex items-center rounded-lg px-[5px] transition-colors",
-        active ? "bg-black/5" : "hover:bg-black/3",
+        active ? "bg-tint" : "hover:bg-tint-soft",
       )}
     >
       {orbColors ? (
@@ -455,7 +455,7 @@ function SidebarRow({
                   onDelete();
                 }
               }}
-              className="size-6 hover:text-rose-700"
+              className="size-6 hover:text-danger"
             >
               <Trash2 className="size-3" />
             </IconButton>
@@ -518,7 +518,7 @@ function BoardMenu({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded-lg py-1.5 pl-1.5 pr-1 text-left transition-colors hover:bg-black/4"
+        className="flex w-full items-center gap-2 rounded-lg py-1.5 pl-1.5 pr-1 text-left transition-colors hover:bg-tint-soft"
       >
         <JuniorMark className="-mt-px size-4 shrink-0 text-ink" />
         {/* Not `flex-1`: the chevron should sit next to the name, not be pushed
@@ -544,7 +544,7 @@ function BoardMenu({
               href={`/board/${board.id}`}
               onClick={() => setOpen(false)}
               className={cn(
-                "block truncate rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-black/5",
+                "block truncate rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-tint",
                 board.id === boardId
                   ? "font-semibold text-accent-ink"
                   : "text-ink",
@@ -572,7 +572,7 @@ function BoardMenu({
             <button
               type="button"
               onClick={() => setCreating(true)}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-ink transition-colors hover:bg-black/5"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-ink transition-colors hover:bg-tint"
             >
               <Plus className="size-3.5" /> New board
             </button>
@@ -584,7 +584,7 @@ function BoardMenu({
               setOpen(false);
               setRenaming(true);
             }}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-ink transition-colors hover:bg-black/5"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-ink transition-colors hover:bg-tint"
           >
             <Pencil className="size-3.5" /> Rename board
           </button>
@@ -597,7 +597,7 @@ function BoardMenu({
                   startTransition(() => actions.deleteBoard(boardId));
                 }
               }}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-rose-700 transition-colors hover:bg-rose-500/10"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-danger transition-colors hover:bg-danger-face"
             >
               <Trash2 className="size-3.5" /> Delete this board
             </button>

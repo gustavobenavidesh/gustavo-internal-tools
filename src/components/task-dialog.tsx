@@ -290,7 +290,7 @@ export function TaskDialog({
             <span
               className={cn(
                 "text-[11px]",
-                unsaved ? "font-medium text-rose-700" : "text-ink-faint",
+                unsaved ? "font-medium text-danger" : "text-ink-faint",
               )}
             >
               {unsaved
@@ -315,7 +315,7 @@ export function TaskDialog({
             still takes a Save, so the recovery goes through the same path every
             other edit does and can be looked at first. */}
         {orphan && (
-          <div className="flex items-center gap-3 rounded-[var(--corner-field)] bg-amber-50 px-3 py-2 text-[12px] text-amber-900 ring-1 ring-inset ring-amber-200">
+          <div className="flex items-center gap-3 rounded-[var(--corner-field)] bg-warn-face px-3 py-2 text-[12px] text-warn-ink ring-1 ring-inset ring-warn-edge">
             <span className="min-w-0 flex-1">
               Unsaved edits from {format(orphan.at, "MMM d, h:mm a")} were never
               stored.
@@ -332,7 +332,7 @@ export function TaskDialog({
             </button>
             <button
               type="button"
-              className="shrink-0 text-amber-700/70 hover:text-amber-900"
+              className="shrink-0 text-warn-ink-soft hover:text-warn-ink"
               onClick={() => {
                 clearDraft(task.id);
                 setOrphan(null);
@@ -632,7 +632,7 @@ function Subtasks({
                 : "ring-hairline-strong hover:ring-ink-ghost",
             )}
           >
-            {sub.done && <Check className="size-3 text-white" />}
+            {sub.done && <Check className="size-3 text-canvas" />}
           </button>
 
           <input
@@ -654,7 +654,7 @@ function Subtasks({
           <IconButton
             label="Delete subtask"
             onClick={() => onDelete(sub.id)}
-            className="size-6 opacity-0 hover:text-rose-700 group-hover:opacity-100"
+            className="size-6 opacity-0 hover:text-danger group-hover:opacity-100"
           >
             <Trash2 className="size-3" />
           </IconButton>
