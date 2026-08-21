@@ -127,12 +127,13 @@
      points above a canvas of nineteen, against a task card at forty-two. */
   --color-tint-card: rgb(0 0 0 / 0.04);
 
-  /* The search field, which is the app's one deliberately inverted surface: a
-     dark pill on a light canvas, with white inside it. That trick is only
-     available while everything around it is light — on a dark canvas a dark pill
-     is a hole — so in the dark theme it stops being inverted and becomes a lifted
-     well like any other. Its own tokens because nothing else in the app is built
-     this way, and because the cap and the glyphs inside have to move with it. */
+  /* The search field, which is the app's one deliberately inverted surface: a dark
+     pill on a light canvas, with white inside it. The dark theme keeps that idea
+     rather than dropping it — it just runs the other way, a light pill with the
+     ink inside. The alpha and the two steps of hover are the same numbers on both
+     sides, so the field sits the same distance from its canvas whichever way round
+     the app is. Its own tokens because nothing else here is built this way, and
+     because the cap and the glyphs have to travel with it. */
   --color-well: rgb(35 35 37 / 0.4);
   --color-well-hover: rgb(35 35 37 / 0.5);
   --color-well-ink: #ffffff;
@@ -276,12 +277,24 @@
   --color-tint-soft: rgb(255 255 255 / 0.04);
   --color-tint-card: rgb(255 255 255 / 0.035);
 
-  /* No longer inverted — see the light values. A well lifted off the canvas,
-     with the app's own ink in it rather than white. */
-  --color-well: rgb(255 255 255 / 0.07);
-  --color-well-hover: rgb(255 255 255 / 0.11);
-  --color-well-ink: #ededed;
-  --color-well-cap: rgb(0 0 0 / 0.35);
+  /* Lifted off the canvas, and white inside it — the same white the light theme
+     puts on its dark pill, which is the part that carries across. What doesn't
+     carry is the alpha: matching the light theme's 40% put the pill at mid-grey,
+     which on a near-black canvas is a slab rather than a field. A fifth of white
+     is enough to read as a distinct surface at rgb(66) against a canvas of 19,
+     and it leaves the white contents at about ten to one instead of the light
+     theme's soft two and a half.
+
+     Hover *darkens* here where it deepens there, which sounds backwards and isn't:
+     the rule on both sides is that hovering moves the fill away from the white on
+     top of it, so the words get clearer rather than muddier under the pointer.
+
+     The cap stays set into the pill, a step darker, exactly as in the light theme —
+     black over a lifted fill instead of over a sunken one. */
+  --color-well: rgb(255 255 255 / 0.2);
+  --color-well-hover: rgb(255 255 255 / 0.14);
+  --color-well-ink: #ffffff;
+  --color-well-cap: rgb(0 0 0 / 0.25);
 
   --color-danger: #fb7185;
   --color-danger-strong: #fda4af;
