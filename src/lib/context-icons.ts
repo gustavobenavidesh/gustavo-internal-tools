@@ -7,6 +7,7 @@ import {
   Megaphone,
   Monitor,
   Smartphone,
+  Watch,
 } from "lucide-react";
 
 /**
@@ -17,6 +18,10 @@ import {
 const CONTEXT_ICONS: Array<[RegExp, LucideIcon]> = [
   [/web app/i, AppWindow],
   [/desktop/i, Monitor],
+  /* Ahead of the phone, since a watch is the more specific claim and "watchOS"
+     would otherwise be caught by neither — and a watch app is a phone app's
+     companion often enough that the two names sit together. */
+  [/watch/i, Watch],
   [/mobile|ios|android/i, Smartphone],
   [/website|site|landing/i, Globe],
   [/marketing|content|social/i, Megaphone],
