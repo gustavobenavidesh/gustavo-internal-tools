@@ -37,7 +37,10 @@ type Props = {
   drop?: DropHint | null;
   /** This is the card the sheet is showing. */
   viewing?: boolean;
+  /** This is the card being worked on — see `src/lib/focus.ts`. */
+  focused?: boolean;
   onOpen: (taskId: string) => void;
+  onToggleFocus?: (taskId: string) => void;
   onSetContexts: (taskId: string, contextIds: string[]) => void;
   onSetPriority: (taskId: string, priority: Priority) => void;
   onToggleSubtask: (taskId: string, subtaskId: string, done: boolean) => void;
@@ -50,7 +53,9 @@ export function TaskCard({
   muted,
   drop,
   viewing,
+  focused,
   onOpen,
+  onToggleFocus,
   onSetContexts,
   onSetPriority,
   onToggleSubtask,
@@ -136,6 +141,8 @@ export function TaskCard({
         muted={muted}
         drop={drop}
         viewing={viewing}
+        focused={focused}
+        onToggleFocus={onToggleFocus}
         onSetContexts={onSetContexts}
         onSetPriority={onSetPriority}
         onToggleSubtask={onToggleSubtask}
@@ -159,8 +166,10 @@ export function TaskCardBody({
   muted,
   drop,
   viewing,
+  focused,
   overlay,
   className,
+  onToggleFocus,
   onSetContexts,
   onSetPriority,
   onToggleSubtask,
@@ -172,7 +181,9 @@ export function TaskCardBody({
   muted?: boolean;
   drop?: DropHint | null;
   viewing?: boolean;
+  focused?: boolean;
   overlay?: boolean;
+  onToggleFocus?: (taskId: string) => void;
   onSetContexts?: (taskId: string, contextIds: string[]) => void;
   onSetPriority?: (taskId: string, priority: Priority) => void;
   onToggleSubtask?: (taskId: string, subtaskId: string, done: boolean) => void;
@@ -267,8 +278,14 @@ export function TaskCardBody({
               "outline outline-2 outline-dashed -outline-offset-2",
               // A parked card has no plate to tint, so its dash is the only
               // thing that can say it's the one about to swallow the drop.
-              swallowing ? "outline-accent" : "outline-hairline-strong",
+              swallowing
+                ? "outline-accent"
+                : focused
+                  ? "outline-transparent"
+                  : "outline-hairline-strong",
             )
+          : focused
+          ? "shadow-[0_6px_20px_-8px] shadow-accent/35"
           : "shadow-[0_5px_16px_-6px] shadow-shade/16 hover:shadow-shade/24",
         overlay &&
           "rotate-3 scale-[1.03] cursor-grabbing shadow-2xl shadow-shade/30",
@@ -286,12 +303,24 @@ export function TaskCardBody({
       {/* Fill and hairline, both following the continuous corner. Parked cards
           get no plate: they have no fill, and their edge is the dashed outline
           above. */}
-      {!muted && (
+      {(!muted || focused) && (
         <div aria-hidden className="squircle-plate -z-10">
           <div
             className={cn(
               "squircle-surface size-full transition-colors",
-              swallowing
+              // Focus outranks the rest: it's the one state you chose on purpose,
+              // and the others are all descriptions of what the card *is*.
+              //
+              // A parked card gets both the plate and the fill it normally goes
+              // without, which lifts it out of the parked look for as long as it's
+              // focused — the right reading, since a card you're working on isn't
+              // parked. It's also required: the ring is a gradient painted across
+              // the whole shape and only *masked* into a hairline by the face over
+              // it, so a transparent fill doesn't give you a thin ring, it gives you
+              // a card washed in blue.
+              focused
+                ? "focus-edge [--sq-face:color-mix(in_oklab,var(--color-accent-soft)_13%,var(--color-panel-raised))]"
+                : swallowing
                 ? "[--sq-edge:var(--color-accent)] [--sq-face:color-mix(in_oklab,var(--color-accent)_7%,var(--color-panel-raised))]"
                 : overlay
                   ? "[--sq-edge:color-mix(in_oklab,var(--color-accent)_50%,transparent)] [--sq-face:var(--color-panel-raised)]"
@@ -310,6 +339,60 @@ export function TaskCardBody({
           aria-hidden
           className="absolute inset-y-5 -left-px z-10 w-[3px] rounded-full bg-accent/75"
         />
+      )}
+
+      {/* Focus, floating over the card's top-right corner rather than taking a place
+          in its layout — the card's contents are the card, and a control that pushed
+          the title along would read as one of them.
+
+          Inside the card's box, not above it. Hanging it over the top edge looked
+          better on a card in the middle of a column and was clipped clean off on the
+          one at the top, where the scroller's edge is.
+
+          Hover-only in both states, focused or not. The alternative — pinning it
+          open once focus is on — parks it permanently over the notes and done marks
+          that share this corner, and the spinning edge is already saying the card is
+          focused. Nothing is hidden: the same hover that reveals it anywhere else
+          reveals it here.
+
+          The same two guards the pills use: swallow the pointer so the card doesn't
+          start a drag, and the click so the sheet doesn't open behind it. */}
+      {!overlay && onToggleFocus && (
+        <button
+          type="button"
+          aria-pressed={focused}
+          title={focused ? "Stop focusing this card" : "Focus this card"}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFocus(task.id);
+          }}
+          className={cn(
+            // Caps, a size down, with a little tracking — uppercase sets tight at
+            // a UI size and closes up without any, though only a little: this face
+            // is already generously spaced, and the wide letterspacing caps usually
+            // want made a five-letter word read as five separate letters. The box grows as the text shrinks: a pill this small
+            // reads as cramped long before the letters do.
+            //
+            // The padding is split unevenly for the same reason the key caps' is.
+            // `leading-none` makes the line box the font's size, but capitals only
+            // fill it from the baseline to the cap height and leave the descender
+            // space empty underneath — so even padding centres the *box* and leaves
+            // the word riding high in it. A pixel off the bottom onto the top puts
+            // the letters where the eye expects them, at the same overall height.
+            "absolute right-2 top-2 z-20 rounded-full px-2.5 pb-[3px] pt-[5px] text-[9px] font-semibold uppercase leading-none tracking-[0.03em] opacity-0 shadow-sm transition-all group-hover:opacity-100",
+            // Both states are the accent; only the weight differs. The offer is
+            // the accent held lightly — a tinted fill, a blue edge, blue letters —
+            // and taking it fills the same shape in. A grey pill read as a piece of
+            // chrome that happened to be there, rather than the one thing on the
+            // card asking to be pressed.
+            focused
+              ? "bg-accent text-white shadow-accent/25"
+              : "bg-[color-mix(in_oklab,var(--color-accent)_12%,var(--color-panel-raised))] text-accent-ink shadow-accent/15 ring-1 ring-inset ring-[color-mix(in_oklab,var(--color-accent)_38%,transparent)] hover:bg-[color-mix(in_oklab,var(--color-accent)_20%,var(--color-panel-raised))]",
+          )}
+        >
+          {focused ? "Focused" : "Focus"}
+        </button>
       )}
 
       {/* The insertion slot, drawn as a bar along whichever edge the card would

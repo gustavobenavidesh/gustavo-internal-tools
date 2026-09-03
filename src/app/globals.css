@@ -708,6 +708,63 @@ body::before {
   }
 }
 
+/**
+ * Focus mode: an accent arc travelling round a card's edge.
+ *
+ * It rides the squircle's existing 1px edge rather than adding a ring of its own.
+ * `squircle-surface` paints `--sq-edge` across the whole shape and then insets the
+ * face by a pixel over it, so whatever that variable holds shows as a hairline
+ * outline — and it's a `background`, which means it takes a gradient as happily as
+ * a colour. A conic gradient spun about the card's centre therefore *is* the
+ * animation: no extra element, no second clip path, nothing to keep in step with
+ * the corner geometry.
+ *
+ * The angle is a registered property because a plain custom property is a string
+ * to the animation engine and would step from 0 to 360 in one jump. `@property`
+ * gives it a type, which is what lets it interpolate.
+ *
+ * The arc is short and trailed by a softer second stop, so it reads as one bright
+ * thing travelling rather than a wheel of colour turning. Six seconds is
+ * deliberately unhurried: this marks the card you're working on, and a fast spinner
+ * says "waiting" — the wrong verb, and hard to sit beside all afternoon.
+ */
+@property --focus-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes focus-spin {
+  to {
+    --focus-angle: 360deg;
+  }
+}
+
+@utility focus-edge {
+  /* A resting tint the whole way round with one bright pass travelling over it, so
+     the card is ringed even at the moment the arc is on the far side. Two passes,
+     opposite each other: on a card this wide a single one spends most of its time
+     somewhere you aren't looking. */
+  --sq-edge: conic-gradient(
+    from var(--focus-angle),
+    color-mix(in oklab, var(--color-accent) 22%, transparent) 0deg,
+    var(--color-accent) 30deg,
+    color-mix(in oklab, var(--color-accent) 22%, transparent) 80deg,
+    color-mix(in oklab, var(--color-accent) 22%, transparent) 180deg,
+    var(--color-accent) 210deg,
+    color-mix(in oklab, var(--color-accent) 22%, transparent) 260deg,
+    color-mix(in oklab, var(--color-accent) 22%, transparent) 360deg
+  );
+  animation: focus-spin 6s linear infinite;
+
+  /* Still marked, just not moving — the ring is the state, the spin is only how
+     it says so. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    --sq-edge: var(--color-accent);
+  }
+}
+
 @keyframes pop-in {
   from {
     opacity: 0;

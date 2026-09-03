@@ -46,6 +46,7 @@ import { SidebarResizer } from "@/components/sidebar-resizer";
 import { TaskCardBody } from "@/components/task-card";
 import { TaskDialog, type TaskPatch } from "@/components/task-dialog";
 import { celebrate } from "@/lib/celebrate";
+import { readFocused, toggleFocused, writeFocused } from "@/lib/focus";
 import type { Priority } from "@/db/schema";
 import type { HistoryFact } from "@/lib/history-fact";
 import { clipTitle, plainText } from "@/lib/utils";
@@ -98,6 +99,23 @@ export function BoardView({
   const [state, dispatch] = useReducer(boardReducer, data, initBoardState);
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  /**
+   * The cards being worked on, up to three — see `src/lib/focus.ts` for the cap and
+   * why this lives on the device. Read after mount rather than during render,
+   * because the server has no idea which they are and rendering a guess would be a
+   * hydration mismatch; the rings simply arrive a frame late, which for a mark you
+   * set yourself is unnoticeable.
+   */
+  const [focusedTaskIds, setFocusedTaskIds] = useState<string[]>([]);
+  useEffect(() => setFocusedTaskIds(readFocused()), []);
+
+  const toggleFocus = useCallback((taskId: string) => {
+    setFocusedTaskIds((current) => {
+      const next = toggleFocused(current, taskId);
+      writeFocused(next);
+      return next;
+    });
+  }, []);
   const [composeColumnId, setComposeColumnId] = useState<string | null>(null);
   const [dragging, setDragging] = useState<{
     type: "task" | "column";
@@ -1391,6 +1409,8 @@ export function BoardView({
                         dragging?.type === "task" ? dragging.id : null
                       }
                       viewingTaskId={openTaskId}
+                      focusedTaskIds={focusedTaskIds}
+                      onToggleTaskFocus={toggleFocus}
                       composing={composeColumnId === columnId}
                       onComposingChange={(open) =>
                         setComposeColumnId(open ? columnId : null)

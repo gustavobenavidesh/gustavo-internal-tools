@@ -81,6 +81,11 @@ type Props = {
   onSetTaskContexts: (taskId: string, contextIds: string[]) => void;
   onSetTaskPriority: (taskId: string, priority: Priority) => void;
   onToggleSubtask: (taskId: string, subtaskId: string, done: boolean) => void;
+  /** The card being worked on, and the switch for it — see `src/lib/focus.ts`.
+      Named apart from the column's own `onToggleFocus`, which is a different idea
+      entirely: that one features a column, this one marks a card. */
+  focusedTaskIds?: string[];
+  onToggleTaskFocus?: (taskId: string) => void;
   onQuickAdd: (columnId: string, title: string) => void;
   onRename: (columnId: string, name: string) => void;
   onDelete: (columnId: string) => void;
@@ -105,6 +110,8 @@ export function BoardColumn({
   onSetTaskContexts,
   onSetTaskPriority,
   onToggleSubtask,
+  focusedTaskIds,
+  onToggleTaskFocus,
   onQuickAdd,
   onRename,
   onDelete,
@@ -316,7 +323,16 @@ export function BoardColumn({
               muted={column.isMuted}
               drop={dropHint?.targetId === task.id ? dropHint : null}
               viewing={viewingTaskId === task.id}
+              /* Only in the focus column. The board already has one idea of what
+                 you're on right now — this column — and a card marked as current
+                 while sitting in Backlog contradicts it. Gating the control here
+                 rather than in the card keeps the rule where the columns are:
+                 drag a focused card out and the ring goes with it, drag it back
+                 and it returns, because the mark is remembered by id and only
+                 ever *shown* where it means something. */
+              focused={column.isFocus && focusedTaskIds?.includes(task.id)}
               onOpen={onOpenTask}
+              onToggleFocus={column.isFocus ? onToggleTaskFocus : undefined}
               onSetContexts={onSetTaskContexts}
               onSetPriority={onSetTaskPriority}
               onToggleSubtask={onToggleSubtask}

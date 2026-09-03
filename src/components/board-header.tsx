@@ -143,7 +143,12 @@ export function BoardHeader({
         />
       </div>
 
-      <div className="flex items-center gap-2.5 justify-self-end">
+      {/* Tighter than the app's usual `gap-2.5`, because both of these carry their
+          own padding — twelve points inside the button, eight inside the toggle —
+          so the space you actually see between the word and the glyph is the gap
+          plus twenty. At the standard gap they read as two separate controls that
+          happen to share a corner rather than one cluster. */}
+      <div className="flex items-center gap-0.5 justify-self-end">
         <button
           type="button"
           onClick={onAddColumn}
