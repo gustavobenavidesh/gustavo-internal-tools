@@ -139,6 +139,22 @@
   --color-well-ink: #ffffff;
   --color-well-cap: rgb(35 35 37 / 0.25);
 
+  /* The pending-demos note, which is dark in both themes — the second surface in
+     the app that doesn't follow its background, after the search field. It's a
+     scrap laid on top of the board rather than part of it, and being the one dark
+     thing on a light board is what says so at a glance.
+
+     A grey rather than a near-black, though: at full ink it stopped reading as a
+     note laid on the board and started reading as a hole cut through it, which is
+     heavier than anything this small should be. In the dark theme it stays dark and
+     lifts further still, since near-black on near-black is no panel at all.
+
+     No edge. A light hairline is what holds a pale surface against a pale
+     background; this one is the darkest thing on the board and needs nothing to
+     separate it, and the white line only announced where the panel stopped. */
+  --color-note: rgb(74 74 74 / 0.93);
+  --color-note-ink: #f2f2f0;
+
   /* Delete, and the one destructive confirm. Rose reads at 700 on white and has
      to come up several steps to read on near-black — a token, so the components
      stop naming a number that's only right in one theme. */
@@ -295,6 +311,9 @@
   --color-well-hover: rgb(255 255 255 / 0.14);
   --color-well-ink: #ffffff;
   --color-well-cap: rgb(0 0 0 / 0.25);
+
+  --color-note: rgb(58 58 58 / 0.96);
+  --color-note-ink: #ededed;
 
   --color-danger: #fb7185;
   --color-danger-strong: #fda4af;

@@ -42,6 +42,7 @@ import {
 } from "@/components/board-header";
 import { boardReducer, initBoardState } from "@/components/board-state";
 import { type Box, FoldFlight } from "@/components/fold-flight";
+import { PendingDemos } from "@/components/pending-demos";
 import { SidebarResizer } from "@/components/sidebar-resizer";
 import { TaskCardBody } from "@/components/task-card";
 import { TaskDialog, type TaskPatch } from "@/components/task-dialog";
@@ -1355,6 +1356,10 @@ export function BoardView({
             shadow="squircle-shadow-lg"
           />
           <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--corner-board)]">
+          {/* Floats over the board's bottom-right corner. Outside the DnD context
+              on purpose: it isn't part of the drag surface, and a textarea inside
+              one has to fight the pointer sensor for its own clicks. */}
+          <PendingDemos />
           <DndContext
             /* Without an explicit id, dnd-kit names its hidden drag description
                from a module-level counter — which the server process keeps
