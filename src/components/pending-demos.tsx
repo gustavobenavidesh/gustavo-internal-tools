@@ -72,7 +72,7 @@ export function PendingDemos() {
       // `backdrop-filter` under one has nothing left to sample. The shadow stays a
       // `box-shadow` on this unclipped root for the same reason a filter can't be
       // used for it.
-      className="absolute bottom-3 right-3 z-20 w-[232px] rounded-[var(--corner-card)] shadow-[0_6px_20px_-8px] shadow-shade/35"
+      className="absolute bottom-3 right-3 z-20 w-[280px] rounded-[var(--corner-card)] shadow-[0_6px_20px_-8px] shadow-shade/35"
       style={{ "--sq-radius": "var(--corner-card)" } as CSSProperties}
     >
       {/* The edge is the fill, not unset. `squircle-surface` paints the edge across
@@ -102,7 +102,11 @@ export function PendingDemos() {
             heading. A step smaller than the chevron opposite it, since one is a
             label and the other is a control. */}
         <MonitorPlay aria-hidden className="size-3.5 shrink-0" />
-        Pending Demos &amp; Announcements
+        {/* One line, always. The panel is wide enough for the title as it stands,
+            and `whitespace-nowrap` is the guard for the next time it grows: a
+            two-line heading over a one-line list reads as the note's contents
+            rather than its name. */}
+        <span className="whitespace-nowrap">Pending Demos &amp; Announcements</span>
         <ChevronDown
           aria-hidden
           // Points the way it would go: down to open the note, up to fold it away.
