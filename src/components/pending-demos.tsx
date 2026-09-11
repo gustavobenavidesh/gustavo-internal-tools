@@ -72,8 +72,16 @@ export function PendingDemos() {
       // `backdrop-filter` under one has nothing left to sample. The shadow stays a
       // `box-shadow` on this unclipped root for the same reason a filter can't be
       // used for it.
-      className="absolute bottom-3 right-3 z-20 w-[276px] rounded-[var(--corner-card)] shadow-[0_6px_20px_-8px] shadow-shade/35"
-      style={{ "--sq-radius": "var(--corner-card)" } as CSSProperties}
+      className="absolute bottom-3 right-3 z-20 w-[276px] rounded-[var(--note-radius)] shadow-[0_6px_20px_-8px] shadow-shade/35"
+      // Four points rounder than a task card. Both names have to move together:
+      // `--sq-radius` shapes the clip path and the plate's corner, and the
+      // `rounded-*` on this unclipped root shapes the shadow underneath it.
+      style={
+        {
+          "--note-radius": "calc(var(--corner-card) + 4px)",
+          "--sq-radius": "var(--note-radius)",
+        } as CSSProperties
+      }
     >
       {/* The edge is the fill, not unset. `squircle-surface` paints the edge across
           the whole shape and insets the face a pixel over it, so leaving it out
