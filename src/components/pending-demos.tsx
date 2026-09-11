@@ -72,7 +72,7 @@ export function PendingDemos() {
       // `backdrop-filter` under one has nothing left to sample. The shadow stays a
       // `box-shadow` on this unclipped root for the same reason a filter can't be
       // used for it.
-      className="absolute bottom-3 right-3 z-20 w-[280px] rounded-[var(--corner-card)] shadow-[0_6px_20px_-8px] shadow-shade/35"
+      className="absolute bottom-3 right-3 z-20 w-[276px] rounded-[var(--corner-card)] shadow-[0_6px_20px_-8px] shadow-shade/35"
       style={{ "--sq-radius": "var(--corner-card)" } as CSSProperties}
     >
       {/* The edge is the fill, not unset. `squircle-surface` paints the edge across
