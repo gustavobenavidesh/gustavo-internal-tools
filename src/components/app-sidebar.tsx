@@ -23,7 +23,7 @@ import { LABEL_COLOR_KEYS, labelColor } from "@/lib/colors";
 import { contextIcon } from "@/lib/context-icons";
 import type { HistoryFact } from "@/lib/history-fact";
 import type { ClientBoard, ClientContext } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, noOrphans } from "@/lib/utils";
 
 type Props = {
   boards: ClientBoard[];
@@ -301,7 +301,11 @@ function FactOfTheDay({ fact }: { fact: HistoryFact }) {
               className="animate-fade-in font-serif text-[13px] leading-[1.45] tracking-normal text-ink-soft"
             >
               <span className="font-semibold text-ink">{current.year}</span> —{" "}
-              {current.text}
+              {/* Bound to the word before it, so a fact can't end on a line holding
+                  one word. Card titles have gone through this since they were
+                  written; this is the longest run of prose in the app and the one
+                  most likely to strand something, which is how it got missed. */}
+              {noOrphans(current.text)}
             </p>
 
             <a

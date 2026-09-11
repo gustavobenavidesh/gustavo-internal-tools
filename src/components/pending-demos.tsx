@@ -102,7 +102,7 @@ export function PendingDemos() {
             heading. A step smaller than the chevron opposite it, since one is a
             label and the other is a control. */}
         <MonitorPlay aria-hidden className="size-3.5 shrink-0" />
-        Pending Demos
+        Pending Demos &amp; Announcements
         <ChevronDown
           aria-hidden
           // Points the way it would go: down to open the note, up to fold it away.
