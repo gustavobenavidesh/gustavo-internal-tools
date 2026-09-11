@@ -86,6 +86,42 @@ export function PendingDemos() {
         edge="var(--color-note)"
         surfaceClassName="backdrop-blur-sm"
       />
+
+      {/* Film, in two layers, because that's what the look is made of.
+          Neither is positioned above the text: both are `z-0` like the plate, and
+          the header and body below are `relative`, so tree order puts the words on
+          top of the stock rather than under it.
+
+          The grain is the app's own paper turbulence, reused at a different job —
+          the same noise that reads as fibre on a light surface reads as emulsion on
+          a dark one. It takes its own opacity rather than `--grain-opacity`, which
+          is zeroed in the dark theme for the paper it was made for.
+
+          `overlay`, not `soft-light`. The noise is greyscale centred on mid-grey
+          and the fill it sits on is also mid-grey, and soft-light between two mid
+          greys is very nearly the identity — the first version was mathematically
+          almost a no-op, which is exactly how it looked.
+
+          Then a vignette, which is the part that actually says cinema: corners
+          falling off toward black, weighted wider than tall so it reads as a frame
+          rather than a spotlight. Kept under a tenth, since anything you notice as
+          a gradient has stopped being a vignette. */}
+      <div
+        aria-hidden
+        className="squircle pointer-events-none absolute inset-0 z-0 opacity-[0.5] mix-blend-overlay"
+        style={{
+          backgroundImage: "var(--grain)",
+          backgroundSize: "var(--grain-size) var(--grain-size)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="squircle pointer-events-none absolute inset-0 z-0"
+        style={{
+          backgroundImage:
+            "radial-gradient(125% 95% at 50% 45%, transparent 30%, rgb(0 0 0 / 0.28) 72%, rgb(0 0 0 / 0.5) 100%)",
+        }}
+      />
       {/* The whole header is the collapse control. A floating panel that can't get
           out of the way is in the way, and a separate button for it would be more
           chrome than the panel itself has. */}

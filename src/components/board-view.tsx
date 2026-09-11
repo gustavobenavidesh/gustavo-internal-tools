@@ -47,6 +47,7 @@ import { SidebarResizer } from "@/components/sidebar-resizer";
 import { TaskCardBody } from "@/components/task-card";
 import { TaskDialog, type TaskPatch } from "@/components/task-dialog";
 import { celebrate } from "@/lib/celebrate";
+import { inferContextIds } from "@/lib/contexts";
 import { readFocused, toggleFocused, writeFocused } from "@/lib/focus";
 import type { Priority } from "@/db/schema";
 import type { HistoryFact } from "@/lib/history-fact";
@@ -633,11 +634,29 @@ export function BoardView({
   const quickAdd = (columnId: string, title: string) => {
     const remember = recorder();
     persist(async () => {
-      // Adding a card while a context is selected files it under that context.
-      const contextIds =
+      /**
+       * Two ways a new card gets filed, and it takes both: the context you're
+       * filtered to, and whatever its title names. Titles here read like "action
+       * items @ mobile app", so the surface is usually already written down —
+       * reading it is less work than clicking the pill afterwards.
+       *
+       * A union rather than a precedence, since they answer different questions.
+       * The filter says where you're standing; the title says what the card is
+       * about, and a card written while filtered to Web App that says "desktop app"
+       * plausibly belongs to both.
+       */
+      const selected =
         filters.contextId && filters.contextId !== "none"
           ? [filters.contextId]
           : [];
+      const contextIds = [
+        ...new Set([
+          // `live.current`, not the render's `state`, per the rule every mutation
+          // here follows: this runs inside a handler that may outlive its render.
+          ...selected,
+          ...inferContextIds(title, live.current.contexts),
+        ]),
+      ];
       const task = await actions.createTask({
         boardId,
         columnId,
