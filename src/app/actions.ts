@@ -527,20 +527,39 @@ export async function listAttachments(taskId: string) {
     .all();
 }
 
+/**
+ * The image arrives as a `File`, not as a data URL.
+ *
+ * It used to come base64 already, and that broke on anything bigger than a small
+ * screenshot with "Maximum array nesting exceeded" — React caps a server action's
+ * decoded arguments at a million slots and a megabytes-long string blows straight
+ * through it. Next doesn't expose that limit, so the answer isn't a bigger number:
+ * a `File` travels as multipart binary instead of as one enormous string, which
+ * skips the counter entirely and drops a third of the bytes that base64 was adding
+ * on the way.
+ *
+ * The encoding happens here rather than in the browser, so the column keeps storing
+ * a data URL and nothing downstream — the canvas, the backup, the existing rows —
+ * has to know this changed.
+ */
 export async function addAttachment(
   taskId: string,
-  data: string,
+  file: File,
   width: number,
   height: number,
   x: number,
   y: number,
 ) {
-  if (!data.startsWith("data:image/")) {
+  if (!file.type.startsWith("image/")) {
     throw new Error("Only images can go on the canvas");
   }
-  if (data.length > MAX_ATTACHMENT) {
+  if (file.size > MAX_ATTACHMENT) {
     throw new Error("That image is too large for the canvas");
   }
+
+  const data = `data:${file.type};base64,${Buffer.from(
+    await file.arrayBuffer(),
+  ).toString("base64")}`;
 
   const last = db
     .select({ value: max(attachments.position) })

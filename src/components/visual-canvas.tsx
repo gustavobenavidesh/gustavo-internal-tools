@@ -343,13 +343,13 @@ export function VisualCanvas({
     setBusy(true);
     setError(null);
     try {
-      const data = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(blob);
-      });
-
+      /**
+       * Measured through a blob URL rather than by reading the file into a data URL
+       * first. The measurement is the only reason the bytes were ever decoded here,
+       * and the file itself is what goes to the server now — base64 in the browser
+       * bought nothing but a third more bytes and the string that broke the action.
+       */
+      const url = URL.createObjectURL(blob);
       const natural = await new Promise<{ width: number; height: number }>(
         (resolve) => {
           const image = new Image();
@@ -357,9 +357,10 @@ export function VisualCanvas({
             resolve({ width: image.naturalWidth, height: image.naturalHeight });
           // A shape it can still lay out if the decode fails.
           image.onerror = () => resolve({ width: 1200, height: 800 });
-          image.src = data;
+          image.src = url;
         },
       );
+      URL.revokeObjectURL(url);
 
       const el = viewport.current;
       const box = el?.getBoundingClientRect();
@@ -377,7 +378,7 @@ export function VisualCanvas({
 
       const row = await actions.addAttachment(
         taskId,
-        data,
+        blob,
         natural.width,
         natural.height,
         Math.round(x),
