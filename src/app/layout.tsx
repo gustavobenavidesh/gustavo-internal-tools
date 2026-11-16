@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { IDLE_SCRIPT } from "@/lib/idle";
 import { THEME_SCRIPT, TITLE_BAR } from "@/lib/theme";
 import "./globals.css";
 
@@ -71,6 +72,12 @@ export default function RootLayout({
           suppressHydrationWarning
         />
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* Marks the document idle while it's hidden, which the stylesheet uses to
+            pause every running animation — see the `data-idle` rule there. Inline
+            and not a component, for the same reason the theme script is: it has to
+            be listening before the first frame, and it is one line of state that
+            React never needs to own. */}
+        <script dangerouslySetInnerHTML={{ __html: IDLE_SCRIPT }} />
         {children}
       </body>
     </html>
