@@ -358,17 +358,6 @@ export function BoardView({
         !task.contextIds.includes(filters.contextId)
       )
         return false;
-      if (filters.hideDone && task.completedAt !== null) return false;
-      if (
-        filters.priorities.length &&
-        !filters.priorities.includes(task.priority)
-      )
-        return false;
-      if (
-        filters.labelIds.length &&
-        !filters.labelIds.some((id) => task.labelIds.includes(id))
-      )
-        return false;
       if (
         query &&
         !task.title.toLowerCase().includes(query) &&
@@ -552,6 +541,10 @@ export function BoardView({
   };
 
   const onDragStart = ({ active }: DragStartEvent) => {
+    // Whatever the last drag left behind, in case it ended without an event —
+    // `onDragEnd` reads this ref to place the drop, and a stale target would send
+    // the card somewhere nobody aimed it.
+    clearHint();
     const id = String(active.id);
     setDragging({
       type: active.data.current?.type === "column" ? "column" : "task",
@@ -1305,7 +1298,15 @@ export function BoardView({
    * the target flicker back to normal and then grow a row.
    */
   const targetHint: DropHint | null =
-    dropHint ??
+    // Gated on a drag actually being in progress, not just on the hint existing.
+    // The hint is cleared by `onDragEnd` and `onDragCancel`, and dnd-kit does not
+    // always reach either: a card that unmounts mid-drag — a `router.refresh()`
+    // landing from a server action is enough — takes the drag down with it and
+    // fires neither, leaving the last bar drawn on the board with nothing being
+    // dragged. Reading `dragging` as well means the bar can't outlive the gesture
+    // whatever dnd-kit does, since the overlay and the bar now come and go
+    // together.
+    (dragging?.type === "task" ? dropHint : null) ??
     (folding
       ? {
           targetId: folding.targetId,
@@ -1340,7 +1341,6 @@ export function BoardView({
           columns, so it reads as one board surface rather than a window. */}
       <main className="flex min-w-0 flex-1 flex-col pb-3.5 pr-[var(--board-gutter)] pt-1.5">
         <BoardHeader
-          labels={state.labels}
           filters={filters}
           searchRef={searchRef}
           onFiltersChange={setFilters}

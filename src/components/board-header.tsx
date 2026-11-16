@@ -1,36 +1,35 @@
 "use client";
 
 import { Plus, Search, X } from "lucide-react";
-import {
-  type CSSProperties, type RefObject, useState
-} from "react";
-import { FilterKnobs } from "@/components/filter-knobs";
+import type { RefObject } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Button, IconButton, Input, KBD, Plate, useDismiss } from "@/components/ui";
-import { PRIORITIES, type Priority } from "@/db/schema";
-import { PRIORITY_STYLES, labelColor } from "@/lib/colors";
-import type { ClientLabel } from "@/lib/types";
+import { IconButton, Input, KBD } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
+/**
+ * What's hidden right now. Two things, and both of them are picked somewhere
+ * other than a filter panel: the search field here, and the context chosen in
+ * the sidebar.
+ *
+ * There used to be a third — a menu of priority chips, label chips and a
+ * "hide completed" box behind the knobs glyph. It went unused: the sidebar
+ * already answers "what is this about", search answers "where is that card",
+ * and nobody reaches for "show me only the high-priority ones" on a board they
+ * can see all of. A panel of controls nobody opens is still a control you have
+ * to read past every time you look at the toolbar.
+ */
 export type Filters = {
   query: string;
-  priorities: Priority[];
-  labelIds: string[];
-  hideDone: boolean;
   /** A context id, `"none"` for cards without one, or null for everything. */
   contextId: string | null;
 };
 
 export const emptyFilters: Filters = {
   query: "",
-  priorities: [],
-  labelIds: [],
-  hideDone: false,
   contextId: null,
 };
 
 type Props = {
-  labels: ClientLabel[];
   filters: Filters;
   searchRef: RefObject<HTMLInputElement | null>;
   onFiltersChange: (filters: Filters) => void;
@@ -38,17 +37,11 @@ type Props = {
 };
 
 export function BoardHeader({
-  labels,
   filters,
   searchRef,
   onFiltersChange,
   onAddColumn,
 }: Props) {
-  const activeFilterCount =
-    filters.priorities.length +
-    filters.labelIds.length +
-    (filters.hideDone ? 1 : 0);
-
   return (
     // Equal `1fr` side columns centre the search field independently of how
     // wide the controls on the right get, then the translate shifts it from the
@@ -56,9 +49,9 @@ export function BoardHeader({
     <header className="relative z-30 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2.5 px-0 pb-3 pt-1">
       <span aria-hidden />
 
-      {/* Search and Filter travel together, so the translate centres the pair on
-          the viewport rather than the field alone. */}
-      <div className="flex items-center gap-2.5 -translate-x-[calc((var(--sidebar-width)_-_var(--board-gutter))/2)]">
+      {/* The translate centres the field on the viewport rather than on the
+          header, which starts after the sidebar. */}
+      <div className="flex items-center -translate-x-[calc((var(--sidebar-width)_-_var(--board-gutter))/2)]">
         <div className="relative">
           {/* Icon and text are a step down from the app's usual sizes. The pill
               is the widest thing in the toolbar and can't be much narrower and
@@ -134,13 +127,6 @@ export function BoardHeader({
             </kbd>
           )}
         </div>
-
-        <FilterMenu
-          labels={labels}
-          filters={filters}
-          activeCount={activeFilterCount}
-          onChange={onFiltersChange}
-        />
       </div>
 
       {/* Tighter than the app's usual `gap-2.5`, because both of these carry their
@@ -159,147 +145,5 @@ export function BoardHeader({
         <ThemeToggle />
       </div>
     </header>
-  );
-}
-
-function FilterMenu({
-  labels,
-  filters,
-  activeCount,
-  onChange,
-}: {
-  labels: ClientLabel[];
-  filters: Filters;
-  activeCount: number;
-  onChange: (filters: Filters) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useDismiss(open, () => setOpen(false));
-
-  const toggle = <T,>(list: T[], value: T) =>
-    list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
-
-  return (
-    <div className="relative" ref={ref}>
-      {/* No surface of its own: a glyph resting on the canvas beside the field,
-          rather than a second control competing with it. Which means the active
-          state has nowhere to live but the glyph — hence accent rather than a
-          count, with the number kept in the title so it isn't lost. The box is
-          the field's height so the two still sit on one baseline. */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        title={
-          activeCount > 0
-            ? `Filter — ${activeCount} active`
-            : "Filter"
-        }
-        aria-label={
-          activeCount > 0 ? `Filter, ${activeCount} active` : "Filter"
-        }
-        className={cn(
-          "grid size-8 shrink-0 place-items-center rounded-full transition-colors",
-          activeCount > 0
-            ? "text-accent-ink"
-            : "text-ink-ghost hover:text-ink-faint",
-        )}
-      >
-        <FilterKnobs className="size-[18px]" />
-      </button>
-
-      {open && (
-        <div
-          className="absolute right-0 top-9 z-40 isolate w-64 animate-pop-in space-y-3 rounded-[var(--corner-menu)] p-3 shadow-xl shadow-shade/15"
-          style={{ "--sq-radius": "var(--corner-menu)" } as CSSProperties}
-        >
-          <Plate face="var(--color-panel-raised)" edge="var(--color-hairline)" />
-          <div>
-            <p className="mb-1.5 text-[10px] uppercase tracking-wider text-ink-faint">
-              Priority
-            </p>
-            <div className="flex flex-wrap gap-1">
-              {PRIORITIES.filter((p) => p !== "none").map((priority) => (
-                <button
-                  key={priority}
-                  type="button"
-                  onClick={() =>
-                    onChange({
-                      ...filters,
-                      priorities: toggle(filters.priorities, priority),
-                    })
-                  }
-                  className={cn(
-                    "rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset transition-colors",
-                    filters.priorities.includes(priority)
-                      ? cn(
-                          "bg-canvas ring-hairline-strong",
-                          PRIORITY_STYLES[priority].chip,
-                        )
-                      : "text-ink-faint ring-hairline hover:text-ink",
-                  )}
-                >
-                  {PRIORITY_STYLES[priority].label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {labels.length > 0 && (
-            <div>
-              <p className="mb-1.5 text-[10px] uppercase tracking-wider text-ink-faint">
-                Labels
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {labels.map((label) => (
-                  <button
-                    key={label.id}
-                    type="button"
-                    onClick={() =>
-                      onChange({
-                        ...filters,
-                        labelIds: toggle(filters.labelIds, label.id),
-                      })
-                    }
-                    className={cn(
-                      "rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset transition-colors",
-                      filters.labelIds.includes(label.id)
-                        ? labelColor(label.color).chip
-                        : "text-ink-faint ring-hairline hover:text-ink",
-                    )}
-                  >
-                    {label.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <label className="flex cursor-pointer items-center gap-2 text-xs text-ink">
-            <input
-              type="checkbox"
-              checked={filters.hideDone}
-              onChange={(e) =>
-                onChange({ ...filters, hideDone: e.target.checked })
-              }
-              className="size-3.5 accent-[var(--color-accent)]"
-            />
-            Hide completed tasks
-          </label>
-
-          {activeCount > 0 && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="w-full"
-              onClick={() =>
-                onChange({ ...emptyFilters, query: filters.query })
-              }
-            >
-              Clear filters
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
