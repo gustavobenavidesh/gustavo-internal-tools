@@ -44,6 +44,12 @@ export type HistoryFact = {
   text: string;
   source: string;
   sourceUrl: string;
+  /**
+   * The calendar day the fact was drawn for, as `MM-DD`. Carried so a tab that
+   * was open across midnight can tell its fact is yesterday's and ask for a new
+   * one — the hourly timer alone can't, and a sleeping machine suspends it.
+   */
+  day: string;
 };
 
 type OnThisDay = {
@@ -67,9 +73,7 @@ type OnThisDay = {
  * them before the date rolls over.
  */
 export async function getHistoryFacts(): Promise<HistoryFact[]> {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
+  const [month, day] = today().split("-");
 
   try {
     const response = await fetch(
@@ -112,6 +116,7 @@ export async function getHistoryFacts(): Promise<HistoryFact[]> {
       return {
         year: event.year,
         text: event.text,
+        day: `${month}-${day}`,
         source: page?.titles?.normalized ?? "Wikipedia",
         sourceUrl:
           page?.content_urls?.desktop?.page ??
@@ -122,6 +127,14 @@ export async function getHistoryFacts(): Promise<HistoryFact[]> {
     // A missing fact is not worth failing the board over.
     return [];
   }
+}
+
+/** Today's calendar day in the server's timezone, as `MM-DD`. */
+export function today(): string {
+  const now = new Date();
+  return `${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate(),
+  ).padStart(2, "0")}`;
 }
 
 /** The hour's pick: stable within the hour, rotating on it. */

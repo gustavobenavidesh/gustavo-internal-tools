@@ -212,6 +212,14 @@ export function AppSidebar({
  * Wikipedia's "on this day", rotating hourly. Sits in the sidebar's bottom
  * group, which `mt-auto` pushes down however many contexts there are.
  */
+/** Today as `MM-DD`, matching the shape a fact carries. */
+function localDay(): string {
+  const now = new Date();
+  return `${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate(),
+  ).padStart(2, "0")}`;
+}
+
 function FactOfTheDay({ fact }: { fact: HistoryFact }) {
   // Seeded from the server's hourly pick, then swapped locally when you ask for
   // another. Re-syncs if the server sends a new one (a new hour, or a reload).
@@ -236,20 +244,44 @@ function FactOfTheDay({ fact }: { fact: HistoryFact }) {
   // Roll over on the hour whether or not the fact was shuffled by hand. Timed to
   // the next real hour boundary rather than every 60 minutes from mount, so the
   // change lands on the hour.
+  //
+  // The same effect is what keeps the fact on *today's* date. The card is read
+  // in a Dock window that stays open for days, and a timer is not enough on its
+  // own: a sleeping machine suspends it, so a tab can wake well past midnight
+  // still showing yesterday's day. So every fact carries the day it was drawn
+  // for, and the card re-asks whenever that stops matching the calendar —
+  // including the moment the window is looked at again.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
+
+    const refresh = async () => {
+      const next = await hourlyHistoryFact();
+      if (next) setCurrent(next);
+    };
+
+    const refreshIfStale = () => {
+      setCurrent((fact) => {
+        if (fact.day !== localDay()) void refresh();
+        return fact;
+      });
+    };
 
     const scheduleNextHour = () => {
       const msToNextHour = 3_600_000 - (Date.now() % 3_600_000);
       timer = setTimeout(async () => {
-        const next = await hourlyHistoryFact();
-        if (next) setCurrent(next);
+        await refresh();
         scheduleNextHour();
       }, msToNextHour + 1_000);
     };
 
     scheduleNextHour();
-    return () => clearTimeout(timer);
+    window.addEventListener("focus", refreshIfStale);
+    document.addEventListener("visibilitychange", refreshIfStale);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("focus", refreshIfStale);
+      document.removeEventListener("visibilitychange", refreshIfStale);
+    };
   }, []);
 
   const regenerate = () => {
@@ -434,7 +466,7 @@ function SidebarRow({
         </span>
       </button>
 
-      <span className="grid min-w-5 shrink-0 place-items-center font-mono text-[11px] tabular-nums text-ink-ghost group-hover:hidden">
+      <span className="grid min-w-5 shrink-0 place-items-center numerals text-[11px] text-ink-ghost group-hover:hidden">
         {count || ""}
       </span>
 

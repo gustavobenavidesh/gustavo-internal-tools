@@ -251,7 +251,7 @@ export function BoardColumn({
 
         <span
           className={cn(
-            "rounded px-1.5 py-0.5 font-mono text-[11px] tabular-nums",
+            "numerals rounded px-1.5 py-0.5 text-[11px]",
             overLimit ? "bg-warn-edge/40 text-warn-ink" : "text-ink-faint",
           )}
           title={
