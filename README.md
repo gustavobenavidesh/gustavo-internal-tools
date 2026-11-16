@@ -6,8 +6,16 @@ A personal kanban for organising my tasks. Local-first, single user, no login.
 cp .env.example .env.local   # set DATABASE_FILE to a path outside the repo
 npm install
 npm run db:push              # creates that file from src/db/schema.ts
-npm run dev                  # http://localhost:3000
+npm run dev                  # http://localhost:3001
 ```
+
+The port is pinned in the `dev` script rather than left on Next's default, because
+the board is installed as a Dock app and an installed web app is bound to an
+origin — the window opens whatever is serving on that port. If this server is
+down when another local project takes 3001, the window follows that app instead,
+and an installed window has no address bar to steer it back with. Hence the
+catch-all in `src/app/[...rest]`: any path this app doesn't have sends you to the
+board, so the window recovers on its own the next time it reloads.
 
 `db:push` only works against a database that doesn't exist yet — see the note on
 migrations below — so run it once, before the first `dev`. Nothing else is
@@ -29,7 +37,7 @@ directory above it. So for `DATABASE_FILE=C:/Users/you/kanban/kanban.db`, create
 `C:\Users\you\kanban` first. Forward slashes in `.env.local` are correct on Windows —
 Node accepts them, and they save escaping every backslash.
 
-Then `npm run dev` and open http://localhost:3000. To get the app-like window, open
+Then `npm run dev` and open http://localhost:3001. To get the app-like window, open
 it in Edge or Chrome and use Install as app; there's no installer and nothing to
 package — it's a local web app that keeps its data in one SQLite file.
 
