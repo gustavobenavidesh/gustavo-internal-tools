@@ -1,5 +1,6 @@
 import {
   AppWindow,
+  AudioLines,
   Compass,
   Folder,
   Globe,
@@ -24,6 +25,10 @@ const CONTEXT_ICONS: Array<[RegExp, LucideIcon]> = [
   [/watch/i, Watch],
   [/mobile|ios|android/i, Smartphone],
   [/website|site|landing/i, Globe],
+  /* A waveform rather than a microphone: a mic is what you talk *into*, and this
+     one is the thing that talks back. Matched on what it does as well as on its
+     name, so a context renamed from "Athena" to something plainer keeps it. */
+  [/athena|voice|speech|audio|dictat/i, AudioLines],
   [/marketing|content|social/i, Megaphone],
   [/sidequest|side task|side quest|misc/i, Compass],
 ];
