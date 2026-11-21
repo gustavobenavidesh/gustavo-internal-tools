@@ -310,11 +310,12 @@ export async function moveTask(
     positionOf(nextTaskId),
   );
 
-  const isDone = db
-    .select({ isDone: columns.isDone })
+  const target = db
+    .select({ isDone: columns.isDone, isMuted: columns.isMuted })
     .from(columns)
     .where(eq(columns.id, columnId))
-    .get()?.isDone;
+    .get();
+  const isDone = target?.isDone;
 
   db.update(tasks)
     .set({
@@ -324,11 +325,25 @@ export async function moveTask(
       // Dropping into a done column completes the task, and dragging back out
       // un-completes it, so the two never disagree.
       completedAt: isDone ? new Date() : null,
+      /**
+       * A parked column takes no priorities. Ranking a backlog is ranking work
+       * nobody has agreed to do — the order is a wish, and a "High" sitting in
+       * one is a promise the column can't keep. So the card arrives flat, and
+       * picks a priority up again on its way out.
+       *
+       * The flag rather than the name, so this follows what a column *is*: the
+       * same thing that dims its cards is the thing that strips their ranking.
+       */
+      ...(target?.isMuted ? { priority: "none" as const } : {}),
     })
     .where(eq(tasks.id, taskId))
     .run();
 
-  return { position, completedAt: isDone ? Date.now() : null };
+  return {
+    position,
+    completedAt: isDone ? Date.now() : null,
+    priorityCleared: target?.isMuted ?? false,
+  };
 }
 
 /**

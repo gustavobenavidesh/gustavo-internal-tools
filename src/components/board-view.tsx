@@ -685,7 +685,18 @@ export function BoardView({
    * drag because nothing moves until the drop: the card is still in the slot it
    * was picked up from, and this is the only write the whole gesture makes.
    */
-  const moveTaskTo = (taskId: string, columnId: string, index: number) => {
+  /**
+   * `restorePriority` is only ever passed by this function's own undo entry: a
+   * card dropped in a parked column loses its priority (see `moveTask`), and the
+   * move and the forgetting have to come back as one step. Without it ⌘Z would
+   * carry the card home and leave its ranking behind.
+   */
+  const moveTaskTo = (
+    taskId: string,
+    columnId: string,
+    index: number,
+    restorePriority?: Priority,
+  ) => {
     const task = live.current.tasks[taskId];
     if (!task || !live.current.taskOrder[columnId]) return;
 
@@ -705,8 +716,26 @@ export function BoardView({
     // for ⌘Z to step back through later.
     if (sameColumn && at === origin.index) return;
 
-    record("the move", () => moveTaskTo(taskId, origin.columnId, origin.index));
+    const priority =
+      restorePriority ??
+      (live.current.columns[columnId]?.isMuted ? "none" : task.priority);
+
+    record("the move", () =>
+      moveTaskTo(taskId, origin.columnId, origin.index, task.priority),
+    );
     dispatch({ type: "task/move", taskId, toColumnId: columnId, toIndex: index });
+    if (priority !== task.priority) {
+      // The server does this itself on the way through `moveTask`, so this is
+      // only the optimistic half — except on an undo, which is reinstating a
+      // priority the move can't infer and has to write for itself.
+      dispatch({ type: "task/patch", taskId, patch: { priority } });
+      if (restorePriority) {
+        persist(
+          () => actions.updateTask(taskId, { priority }),
+          "Couldn't put that card's priority back",
+        );
+      }
+    }
     persist(
       () =>
         actions.moveTask(

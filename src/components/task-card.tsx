@@ -514,11 +514,24 @@ export function TaskCardBody({
               className={cn(
                 // A parked card is dashed, but what's *assigned* to it isn't —
                 // only genuinely empty slots get the placeholder treatment.
+                // Every pill is a chip set *into* its card, and what makes it
+                // read that way is being a shade off the fill behind it. So the
+                // fill is what picks the tone, twice over: on the green of a
+                // finished card the canvas grey all but disappears, and a parked
+                // card has no fill at all — it *is* the canvas, so a canvas pill
+                // on it is an outline around nothing. Both take the raised white
+                // instead, which on a dashed card is the only thing in it with a
+                // surface, and reads as the one part you can actually press.
                 done
-                  ? // White, not the canvas tone: on the green fill of a
-                    // finished card the grey pill all but disappears.
-                    "bg-panel-raised text-ink-soft ring-success/15"
-                  : "bg-canvas text-ink-soft ring-hairline",
+                  ? "bg-panel-raised text-ink-soft ring-success/15"
+                  : muted
+                    ? // The one lift in the app this small: a parked card has no
+                      // shadow of its own, so a pill sitting on it has nothing
+                      // under it to be raised against — three points at four
+                      // percent, which is less a shadow than a reason for the
+                      // white to look like it's resting on something.
+                      "bg-panel-raised text-ink-soft ring-hairline shadow-[0_1px_3px] shadow-shade/4"
+                    : "bg-canvas text-ink-soft ring-hairline",
                 docked && "pr-2.5",
               )}
               style={
@@ -554,7 +567,9 @@ export function TaskCardBody({
                 "-ml-[7px] w-6 justify-center px-0",
                 done
                   ? "bg-panel-raised text-ink-faint ring-success/15 hover:text-ink-soft"
-                  : "bg-canvas text-ink-faint ring-hairline hover:text-ink-soft",
+                  : muted
+                    ? "bg-panel-raised text-ink-faint ring-hairline shadow-[0_1px_3px] shadow-shade/4 hover:text-ink-soft"
+                    : "bg-canvas text-ink-faint ring-hairline hover:text-ink-soft",
               )}
               style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}
               label=""
@@ -566,6 +581,13 @@ export function TaskCardBody({
           )
         )}
 
+        {/* No ranking in a parked column. Cards there arrive with their priority
+            cleared (see `moveTask`), so the pill could only ever read "No
+            priority" — an empty control saying nothing, on the cards that most
+            want the quiet. Dropped entirely rather than disabled: there is
+            nothing here to be unavailable, the question simply isn't asked of a
+            backlog. */}
+        {!muted && (
         <PillMenu
           className={task.priority === "none" ? EMPTY_PILL : priority.pill}
           label={task.priority === "none" ? "No priority" : priority.label}
@@ -606,6 +628,7 @@ export function TaskCardBody({
             </>
           )}
         </PillMenu>
+        )}
 
         {labels.map((label) => (
           <span
