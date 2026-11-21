@@ -154,6 +154,10 @@
      separate it, and the white line only announced where the panel stopped. */
   --color-note: rgb(74 74 74 / 0.93);
   --color-note-ink: #f2f2f0;
+  /* The vignette's far tone. Black on the dark card, where corners falling off
+     toward black is what reads as film; see the dark theme for the other half. */
+  --note-vignette-mid: rgb(0 0 0 / 0.28);
+  --note-vignette-edge: rgb(0 0 0 / 0.5);
 
   /* Delete, and the one destructive confirm. Rose reads at 700 on white and has
      to come up several steps to read on near-black — a token, so the components
@@ -312,8 +316,20 @@
   --color-well-ink: #ffffff;
   --color-well-cap: rgb(0 0 0 / 0.25);
 
-  --color-note: rgb(58 58 58 / 0.96);
-  --color-note-ink: #ededed;
+  /* Inverted, like its counterpart in the light theme. The point of this panel
+     was always to be the one surface going the other way — the darkest thing on
+     a light board — and near-grey on near-black was neither: it read as a panel
+     someone forgot to theme. So in the dark it's the lightest thing instead, and
+     keeps the same job of standing apart from everything around it.
+
+     The film goes with it. A vignette is corners falling away from the light, so
+     on a pale card it falls toward grey rather than black, and much more gently:
+     the same 28% of black that reads as a frame over a dark fill reads as dirt
+     over a bright one. */
+  --color-note: rgb(237 237 234 / 0.95);
+  --color-note-ink: #26262a;
+  --note-vignette-mid: rgb(0 0 0 / 0.05);
+  --note-vignette-edge: rgb(0 0 0 / 0.1);
 
   --color-danger: #fb7185;
   --color-danger-strong: #fda4af;
@@ -717,6 +733,33 @@ body::before {
     color: var(--color-accent-ink);
     text-decoration: underline;
     text-underline-offset: 2px;
+  }
+
+  /* Both reachable from the typed markers — preflight strips a heading back to
+     body text, so without these "# " would appear to do nothing at all. A
+     heading inside a note is a label for the paragraph under it rather than a
+     document title, so it stays close to the body size and earns its weight
+     from the tracking instead. */
+  & h3 {
+    margin: 0.5rem 0 0.15rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-ink);
+  }
+
+  & h3:first-child {
+    margin-top: 0;
+  }
+
+  & pre {
+    margin: 0.35rem 0;
+    padding: 0.5rem 0.7rem;
+    border-radius: 0.375rem;
+    background: var(--color-tint);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    white-space: pre-wrap;
   }
 }
 

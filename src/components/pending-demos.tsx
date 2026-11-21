@@ -127,7 +127,7 @@ export function PendingDemos() {
         className="squircle pointer-events-none absolute inset-0 z-0"
         style={{
           backgroundImage:
-            "radial-gradient(125% 95% at 50% 45%, transparent 30%, rgb(0 0 0 / 0.28) 72%, rgb(0 0 0 / 0.5) 100%)",
+            "radial-gradient(125% 95% at 50% 45%, transparent 30%, var(--note-vignette-mid) 72%, var(--note-vignette-edge) 100%)",
         }}
       />
       {/* The whole header is the collapse control. A floating panel that can't get
