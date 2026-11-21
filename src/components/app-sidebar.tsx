@@ -212,12 +212,9 @@ export function AppSidebar({
  * Wikipedia's "on this day", rotating hourly. Sits in the sidebar's bottom
  * group, which `mt-auto` pushes down however many contexts there are.
  */
-/** Today as `MM-DD`, matching the shape a fact carries. */
-function localDay(): string {
-  const now = new Date();
-  return `${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-    now.getDate(),
-  ).padStart(2, "0")}`;
+/** Whole hours since the epoch — the same step the server picks a fact on. */
+function currentHour(): number {
+  return Math.floor(Date.now() / 3_600_000);
 }
 
 function FactOfTheDay({ fact }: { fact: HistoryFact }) {
@@ -225,6 +222,9 @@ function FactOfTheDay({ fact }: { fact: HistoryFact }) {
   // another. Re-syncs if the server sends a new one (a new hour, or a reload).
   const [current, setCurrent] = useState(fact);
   const [spinning, setSpinning] = useState(false);
+  // Which hour the fact on screen belongs to, so a window that missed its tick
+  // can tell on sight that it's holding a stale one.
+  const pickedAt = useRef(currentHour());
   const contentRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | undefined>(undefined);
 
@@ -239,31 +239,40 @@ function FactOfTheDay({ fact }: { fact: HistoryFact }) {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  useEffect(() => setCurrent(fact), [fact]);
+  useEffect(() => {
+    pickedAt.current = currentHour();
+    setCurrent(fact);
+  }, [fact]);
 
   // Roll over on the hour whether or not the fact was shuffled by hand. Timed to
   // the next real hour boundary rather than every 60 minutes from mount, so the
   // change lands on the hour.
   //
-  // The same effect is what keeps the fact on *today's* date. The card is read
-  // in a Dock window that stays open for days, and a timer is not enough on its
-  // own: a sleeping machine suspends it, so a tab can wake well past midnight
-  // still showing yesterday's day. So every fact carries the day it was drawn
-  // for, and the card re-asks whenever that stops matching the calendar —
-  // including the moment the window is looked at again.
+  // A timer alone can't carry this. The card is read in a Dock window that stays
+  // open for days, and Safari throttles timers in a window that isn't focused
+  // while a sleeping machine suspends them outright — so an hour's worth of
+  // wall-clock can pass with no tick, and the fact sits still. The board being
+  // out of focus is exactly when it should have been rotating: you come back to
+  // it expecting something new.
+  //
+  // So the clock is read rather than trusted. The hour the current fact was
+  // picked in is remembered, and any time the window is looked at again the card
+  // asks for a new one if that hour has passed — which covers the day rolling
+  // over too, since a new day is always a new hour.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
 
     const refresh = async () => {
       const next = await hourlyHistoryFact();
-      if (next) setCurrent(next);
+      if (next) {
+        pickedAt.current = currentHour();
+        setCurrent(next);
+      }
     };
 
     const refreshIfStale = () => {
-      setCurrent((fact) => {
-        if (fact.day !== localDay()) void refresh();
-        return fact;
-      });
+      if (document.hidden) return;
+      if (pickedAt.current !== currentHour()) void refresh();
     };
 
     const scheduleNextHour = () => {
@@ -275,6 +284,7 @@ function FactOfTheDay({ fact }: { fact: HistoryFact }) {
     };
 
     scheduleNextHour();
+    refreshIfStale();
     window.addEventListener("focus", refreshIfStale);
     document.addEventListener("visibilitychange", refreshIfStale);
     return () => {
