@@ -4,6 +4,7 @@ import {
   Circle,
   CircleCheck,
   CircleDashed,
+  Drama,
   GitPullRequest,
   Lightbulb,
   type LucideIcon,
@@ -21,6 +22,11 @@ const BY_NAME: Array<[RegExp, LucideIcon]> = [
   [/block|wait|hold|stuck/i, Ban],
   [/now|doing|progress|current|today/i, Target],
   [/next|up next|soon/i, Circle],
+  /* Ahead of the plain backlog, which it would otherwise match: a wishlist is a
+     different kind of list from a queue, and deserves to say so at a glance.
+     Theatre masks, because what's on this list is a story about work rather
+     than work — and because sparkles mean something else now. */
+  [/fictic|fictit|fiction|fantas|dream|wish|imagin|someday\/maybe/i, Drama],
   [/backlog|later|someday|icebox/i, CircleDashed],
   [/review|qa|feedback|check/i, GitPullRequest],
   [/ship|release|launch|live/i, Rocket],
