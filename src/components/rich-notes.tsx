@@ -31,21 +31,32 @@ type Tool = {
   value?: () => string | undefined;
   /** Off for commands that aren't a state you're in, like inserting a link. */
   stateless?: boolean;
-  /** The shortcut the browser already handles, named here for the tooltip. */
+  /** The shortcut, written as it's pressed. Some are the browser's, some ours. */
   key?: string;
 };
 
 const TOOLS: Tool[] = [
-  { icon: Bold, label: "Bold", command: "bold", key: "B" },
-  { icon: Italic, label: "Italic", command: "italic", key: "I" },
+  { icon: Bold, label: "Bold", command: "bold", key: "⌘B" },
+  { icon: Italic, label: "Italic", command: "italic", key: "⌘I" },
   { icon: Strikethrough, label: "Strikethrough", command: "strikeThrough" },
-  { icon: List, label: "Bulleted list", command: "insertUnorderedList" },
-  { icon: ListOrdered, label: "Numbered list", command: "insertOrderedList" },
+  {
+    icon: List,
+    label: "Bulleted list",
+    command: "insertUnorderedList",
+    key: "⇧⌘8",
+  },
+  {
+    icon: ListOrdered,
+    label: "Numbered list",
+    command: "insertOrderedList",
+    key: "⇧⌘7",
+  },
   {
     icon: Quote,
     label: "Quote",
     command: "formatBlock",
     value: () => "blockquote",
+    key: "⇧⌘9",
   },
   {
     icon: Link2,
@@ -73,6 +84,73 @@ const TOOLS: Tool[] = [
  * of the field, and means the only HTML ever stored is what the commands above
  * produce — so there's nothing here that needs sanitising.
  */
+/**
+ * Typed shortcuts, the ones every notes field has: the marker you'd write by
+ * hand becomes the thing it stands for the moment you hit space.
+ *
+ * Only ever fires on a marker sitting alone at the start of a block, so a "-"
+ * mid-sentence is just a hyphen and "1." inside a line stays a number. The
+ * marker is deleted before the command runs, which is also what makes this
+ * undoable in one step — `execCommand` writes to the browser's own undo stack,
+ * so ⌘Z inside the field walks back through these the way it walks back through
+ * typing.
+ */
+/**
+ * The list shortcuts every editor has had since Word, which the browser does not
+ * provide for a `contenteditable` — ⌘B and ⌘I it handles, these it doesn't.
+ *
+ * Keyed on `code` rather than `key`: with shift held, the 8 key reports "*" on a
+ * US layout and something else again elsewhere, while the physical key stays
+ * `Digit8`.
+ */
+const SHORTCUTS: Record<string, [string, string?]> = {
+  Digit8: ["insertUnorderedList"],
+  Digit7: ["insertOrderedList"],
+  Digit9: ["formatBlock", "blockquote"],
+};
+
+const MARKERS: Array<[RegExp, string, string?]> = [
+  [/^[-*+]$/, "insertUnorderedList"],
+  [/^1[.)]$/, "insertOrderedList"],
+  [/^>$/, "formatBlock", "blockquote"],
+  [/^#$/, "formatBlock", "h3"],
+  [/^```$/, "formatBlock", "pre"],
+];
+
+function expandMarker(): boolean {
+  const selection = window.getSelection();
+  if (!selection?.isCollapsed) return false;
+
+  const node = selection.anchorNode;
+  if (!node || node.nodeType !== Node.TEXT_NODE) return false;
+
+  const before = node.textContent?.slice(0, selection.anchorOffset) ?? "";
+  const marker = MARKERS.find(([pattern]) => pattern.test(before));
+  if (!marker) return false;
+
+  // Backwards, one character at a time: `delete` on a collapsed selection is a
+  // backspace, and the markers are two characters at most.
+  for (let i = 0; i < before.length; i++) document.execCommand("delete");
+  document.execCommand(marker[1], false, marker[2]);
+  return true;
+}
+
+/**
+ * Whether the placeholder should show — which is not the same question as
+ * whether the notes are empty.
+ *
+ * Starting a bullet list writes an empty `<li>` and waits for you to type into
+ * it. There's no text yet, so by the only test that used to exist the editor was
+ * blank and the placeholder stayed up — while the caret had been pushed in and
+ * down by the list it was sitting inside, landing it in the middle of the word
+ * "notes". The structure is the content at that moment, so an editor holding any
+ * is not blank.
+ */
+function isBlank(el: HTMLElement) {
+  if (el.textContent?.trim()) return false;
+  return !el.querySelector("li, blockquote, img, table");
+}
+
 export function RichNotes({
   value,
   onChange,
@@ -92,7 +170,7 @@ export function RichNotes({
     const el = editor.current;
     if (!el) return;
     if (el.innerHTML !== value) el.innerHTML = value;
-    setEmpty(!el.textContent?.trim());
+    setEmpty(isBlank(el));
   }, [value]);
 
   // Tags rather than inline styles, so the stored markup stays legible and the
@@ -125,7 +203,7 @@ export function RichNotes({
     const el = editor.current;
     if (!el) return;
     const text = el.textContent?.trim() ?? "";
-    setEmpty(!text);
+    setEmpty(isBlank(el));
     // An emptied editor is left holding a stray `<br>`. Storing nothing instead
     // keeps the card's "has notes" mark and the search agreeing that it's empty.
     onChange(text ? el.innerHTML : "");
@@ -151,7 +229,7 @@ export function RichNotes({
         {TOOLS.map((tool) => (
           <IconButton
             key={tool.label}
-            label={tool.key ? `${tool.label} (⌘${tool.key})` : tool.label}
+            label={tool.key ? `${tool.label} (${tool.key})` : tool.label}
             // The editor loses focus to a press otherwise, and with it the
             // selection the command is about to act on.
             onMouseDown={(e) => e.preventDefault()}
@@ -191,6 +269,22 @@ export function RichNotes({
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
               onSave();
+              return;
+            }
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
+              const shortcut = SHORTCUTS[e.code];
+              if (shortcut) {
+                e.preventDefault();
+                document.execCommand(shortcut[0], false, shortcut[1]);
+                sync();
+                return;
+              }
+            }
+            // The space is what commits the marker, and it isn't typed: it was
+            // only ever the gesture's full stop.
+            if (e.key === " " && expandMarker()) {
+              e.preventDefault();
+              sync();
             }
           }}
           onPaste={(e) => {
