@@ -216,7 +216,7 @@
      They sit ~25% above the values they replaced, because a smoothed corner turns
      later than a circular one and so reads sharper at an equal radius. Raising the
      number buys the softness back without giving up the shape. */
-  --corner-board: 32px;
+  --corner-board: 24px;
   --corner-panel: 20px;
   --corner-card: 20px;
   --corner-menu: 16px;
@@ -634,6 +634,40 @@ body::before {
     opacity: var(--grain-opacity);
     background-image: var(--sq-grain, none);
     background-size: var(--grain-size) var(--grain-size);
+  }
+}
+
+/* The board meets the viewport on the right and bottom, so only its top-left
+   corner follows the shared smoothing curve. Paint behind the content to keep
+   fixed drag overlays outside the clip path. */
+@utility board-surface {
+  background: var(--color-hairline-mid);
+  --sq-radius: var(--corner-board);
+  --sq-c: calc(var(--sq-radius) * var(--corner-smooth));
+  clip-path: shape(
+    from 0 var(--sq-radius),
+    curve to var(--sq-radius) 0 with 0 var(--sq-c) / var(--sq-c) 0,
+    line to 100% 0,
+    line to 100% 100%,
+    line to 0 100%,
+    close
+  );
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 1px 0 0 1px;
+    background: var(--color-surface);
+    --sq-ir: calc(var(--sq-radius) - 1px);
+    --sq-ic: calc(var(--sq-ir) * var(--corner-smooth));
+    clip-path: shape(
+      from 0 var(--sq-ir),
+      curve to var(--sq-ir) 0 with 0 var(--sq-ic) / var(--sq-ic) 0,
+      line to 100% 0,
+      line to 100% 100%,
+      line to 0 100%,
+      close
+    );
   }
 }
 

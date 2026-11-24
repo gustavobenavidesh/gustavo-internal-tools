@@ -225,20 +225,6 @@ function FactOfTheDay({ fact }: { fact: HistoryFact }) {
   // Which hour the fact on screen belongs to, so a window that missed its tick
   // can tell on sight that it's holding a stale one.
   const pickedAt = useRef(currentHour());
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState<number | undefined>(undefined);
-
-  // Track the content's natural height so the wrapper has a number to animate
-  // between. Left undefined on the first paint, so there's no opening animation.
-  useEffect(() => {
-    const el = contentRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() =>
-      setHeight(el.getBoundingClientRect().height),
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
   useEffect(() => {
     pickedAt.current = currentHour();
     setCurrent(fact);
@@ -261,33 +247,40 @@ function FactOfTheDay({ fact }: { fact: HistoryFact }) {
   // over too, since a new day is always a new hour.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
+    let disposed = false;
+    let refreshing = false;
 
-    const refresh = async () => {
-      const next = await hourlyHistoryFact();
-      if (next) {
-        pickedAt.current = currentHour();
-        setCurrent(next);
+    const refreshIfStale = async () => {
+      if (disposed || refreshing || pickedAt.current === currentHour()) return;
+      refreshing = true;
+      const requestedHour = currentHour();
+      try {
+        const next = await hourlyHistoryFact();
+        if (!disposed && next) {
+          pickedAt.current = requestedHour;
+          setCurrent(next);
+        }
+      } catch {
+        // Keep the current fact and retry on the next tick or focus event.
+      } finally {
+        refreshing = false;
       }
     };
 
-    const refreshIfStale = () => {
-      if (document.hidden) return;
-      if (pickedAt.current !== currentHour()) void refresh();
-    };
-
-    const scheduleNextHour = () => {
+    const scheduleNextCheck = () => {
       const msToNextHour = 3_600_000 - (Date.now() % 3_600_000);
       timer = setTimeout(async () => {
-        await refresh();
-        scheduleNextHour();
-      }, msToNextHour + 1_000);
+        await refreshIfStale();
+        if (!disposed) scheduleNextCheck();
+      }, Math.min(msToNextHour + 1_000, 60_000));
     };
 
-    scheduleNextHour();
-    refreshIfStale();
+    scheduleNextCheck();
+    void refreshIfStale();
     window.addEventListener("focus", refreshIfStale);
     document.addEventListener("visibilitychange", refreshIfStale);
     return () => {
+      disposed = true;
       clearTimeout(timer);
       window.removeEventListener("focus", refreshIfStale);
       document.removeEventListener("visibilitychange", refreshIfStale);
@@ -297,9 +290,14 @@ function FactOfTheDay({ fact }: { fact: HistoryFact }) {
   const regenerate = () => {
     setSpinning(true);
     startTransition(async () => {
-      const next = await nextHistoryFact(current.text);
-      if (next) setCurrent(next);
-      setSpinning(false);
+      try {
+        const next = await nextHistoryFact(current.text);
+        if (next) setCurrent(next);
+      } catch {
+        // A failed request should leave the current fact on screen.
+      } finally {
+        setSpinning(false);
+      }
     });
   };
 
@@ -328,20 +326,11 @@ function FactOfTheDay({ fact }: { fact: HistoryFact }) {
           </IconButton>
         </p>
 
-        {/* Height is measured and transitioned: CSS can't animate to `auto`, and
-            facts differ enough in length that the box would otherwise jump. */}
-        <div
-          style={height === undefined ? undefined : { height }}
-          className="overflow-hidden transition-[height] duration-300 ease-out"
-        >
-          {/* Padding, not a margin on the paragraph: a child's top margin
-              collapses through this box and wouldn't be counted in the measured
-              height, cropping the last line. */}
-          <div ref={contentRef} className="pt-2">
-            <p
-              key={current.text}
-              className="animate-fade-in font-serif text-[13px] leading-[1.45] tracking-normal text-ink-soft"
-            >
+        {/* Natural height and visible text do not depend on background animation
+            frames or ResizeObserver delivery. */}
+        <div>
+          <div className="pt-2">
+            <p className="font-serif text-[13px] leading-[1.35] tracking-normal text-ink-soft">
               <span className="font-semibold text-ink">{current.year}</span> —{" "}
               {/* Bound to the word before it, so a fact can't end on a line holding
                   one word. Card titles have gone through this since they were

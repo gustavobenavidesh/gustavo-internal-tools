@@ -34,7 +34,7 @@ import {
 import * as actions from "@/app/actions";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BoardColumn } from "@/components/board-column";
-import { Plate, Toast } from "@/components/ui";
+import { Toast } from "@/components/ui";
 import {
   BoardHeader,
   type Filters,
@@ -1368,7 +1368,7 @@ export function BoardView({
 
       {/* The toolbar floats on the canvas; the card below holds only the
           columns, so it reads as one board surface rather than a window. */}
-      <main className="flex min-w-0 flex-1 flex-col pb-3.5 pr-[var(--board-gutter)] pt-1.5">
+      <main className="flex min-w-0 flex-1 flex-col pt-1.5">
         <BoardHeader
           filters={filters}
           searchRef={searchRef}
@@ -1376,34 +1376,13 @@ export function BoardView({
           onAddColumn={addColumn}
         />
 
-        {/* The card's fill, hairline and shadow are drawn on a plate *behind*
-            the content rather than on the content's own box. Clipping this box to
-            the superellipse would also clip the `DragOverlay`, which is
-            `position: fixed` and rendered inside this subtree — today it escapes
-            because `overflow: hidden` doesn't clip fixed descendants, and a clip
-            path would. The content keeps its circular corner for that clipping,
-            which is strictly inside the squircle, so what shows in the corners is
-            the plate. */}
-        <div
-          className="relative flex min-h-0 flex-1 flex-col"
-          style={
-            {
-              "--sq-radius": "var(--corner-board)",
-            } as CSSProperties
-          }
-        >
-          {/* The strong hairline rather than the plain one: `surface` and the
-              grained canvas behind it are only a few points apart, so at
-              `--color-hairline` this edge all but disappears — and it's the one
-              edge in the app with no shadow close enough underneath to imply it.
-              Task cards keep the lighter tone; they sit on `panel` with more
-              contrast to begin with. */}
-          <Plate
-            face="var(--color-surface)"
-            edge="var(--color-hairline-mid)"
-            shadow="squircle-shadow-lg"
+        {/* Keep the surface separate so fixed drag overlays remain unclipped. */}
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <div
+            aria-hidden
+            className="board-surface pointer-events-none absolute inset-0"
           />
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--corner-board)]">
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-tl-[var(--corner-board)]">
           {/* Floats over the board's bottom-right corner. Outside the DnD context
               on purpose: it isn't part of the drag surface, and a textarea inside
               one has to fight the pointer sensor for its own clicks. */}

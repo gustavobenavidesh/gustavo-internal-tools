@@ -46,7 +46,7 @@ export function BoardHeader({
     // Equal `1fr` side columns centre the search field independently of how
     // wide the controls on the right get, then the translate shifts it from the
     // header's centre to the viewport's — the header starts after the sidebar.
-    <header className="relative z-30 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2.5 px-0 pb-2.5 pt-1">
+    <header className="relative z-30 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2.5 pb-2.5 pr-[var(--board-gutter)] pt-1">
       <span aria-hidden />
 
       {/* The translate centres the field on the viewport rather than on the
@@ -88,7 +88,7 @@ export function BoardHeader({
             // Hover deepens, which on this one *raises* contrast against the
             // white inside it — the opposite of what it did while the fill was
             // light, and the reason the two numbers swapped places.
-            className="h-8 w-[22rem] rounded-full bg-well pl-[34px] pr-8 text-[13px] text-well-ink ring-transparent transition-colors hover:bg-well-hover hover:ring-transparent placeholder:text-well-ink"
+            className="h-8 w-[calc(22rem-40px)] rounded-full bg-well pl-[34px] pr-8 text-[13px] text-well-ink ring-transparent transition-colors hover:bg-well-hover hover:ring-transparent placeholder:text-well-ink"
           />
           {filters.query ? (
             <IconButton
