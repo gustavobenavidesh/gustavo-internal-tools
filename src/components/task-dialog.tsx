@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { Check, ChevronsUpDown, Pencil, Trash2 } from "lucide-react";
+import { Check, ChevronsUpDown, Trash2 } from "lucide-react";
 import {
   type CSSProperties,
   type ReactNode,
@@ -15,18 +15,14 @@ import {
   IconButton,
   Input,
   Modal,
-  PILL,
   Plate,
 } from "@/components/ui";
-import { PRIORITY_STYLES, labelColor } from "@/lib/colors";
 import { type Draft, clearDraft, readDraft, writeDraft } from "@/lib/drafts";
 import { ColumnGlyph } from "@/components/column-glyph";
 import { RichNotes } from "@/components/rich-notes";
 import { VisualCanvas } from "@/components/visual-canvas";
-import { contextIcon } from "@/lib/context-icons";
-import { PriorityBars } from "@/components/priority-bars";
 import { fromDateInputValue, toDateInputValue } from "@/lib/dates";
-import { PRIORITIES, type Priority } from "@/db/schema";
+import type { Priority } from "@/db/schema";
 import type { ClientColumn, ClientContext, ClientTask } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -100,13 +96,11 @@ function same(a: TaskPatch, b: TaskPatch) {
 export function TaskDialog({
   task,
   columns,
-  contexts,
   open,
   onClose,
   onClosed,
   onSave,
   onMoveToColumn,
-  onMoveToBacklog,
   onDelete,
   onAddSubtask,
   onUpdateSubtask,
@@ -205,14 +199,6 @@ export function TaskDialog({
   };
 
   /**
-   * The parking lot column, for the button's glyph and its name. Taken through
-   * `ColumnGlyph` rather than a hardcoded icon, so the button wears whatever that
-   * column's own header wears — and named after it, so a board whose lot is called
-   * Icebox doesn't get a button promising a Backlog.
-   */
-  const backlog = columns.find((column) => column.isMuted);
-
-  /**
    * The column the card is in, whose mark sits in the select. `ColumnGlyph` is the
    * same component that column's own header uses, so the field shows exactly the
    * mark you'd look for on the board.
@@ -233,29 +219,16 @@ export function TaskDialog({
         if (dirty) commit(draft);
       }}
       title={
-        // The title is a bare input with no box, which reads as a heading rather
-        // than a field. The pencil is the only thing saying it can be typed in,
-        // and it turns accent once the caret is in it. Absolutely placed with room
-        // reserved by `pr-6`, since an input can't shrink to its text and a flex
-        // sibling would sit at the far end of the header instead.
-        <div className="group/title relative">
-          <input
-            value={draft.title}
-            onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") save();
-            }}
-            className="w-full bg-transparent pr-6 text-xl font-semibold leading-snug text-ink outline-none placeholder:text-ink-ghost"
-            placeholder="Task title"
-          />
-          <Pencil
-            aria-hidden
-            // `ink-faint` to match the close button beside it — `IconButton`'s
-            // resting tone — rather than the lighter `ink-ghost` a hint would
-            // usually take.
-            className="pointer-events-none absolute right-0 top-1/2 size-3 -translate-y-1/2 text-ink-faint transition-colors group-focus-within/title:text-accent"
-          />
-        </div>
+        <input
+          aria-label="Task title"
+          value={draft.title}
+          onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+          }}
+          className="max-w-full field-sizing-content cursor-text rounded-md bg-transparent text-xl font-semibold leading-snug text-ink outline-none transition-colors hover:bg-tint focus:bg-tint placeholder:text-ink-ghost"
+          placeholder="Task title"
+        />
       }
       footer={
         <>
@@ -264,12 +237,6 @@ export function TaskDialog({
               than the header and body do — the fill on Save is what lets that side
               align its box instead. */}
           <div className="-ml-2 flex items-center gap-1">
-            {onMoveToBacklog && backlog && (
-              <Button variant="ghost" size="sm" onClick={onMoveToBacklog}>
-                <ColumnGlyph column={backlog} className="size-3.5" />
-                Move to {backlog.name.toLowerCase()}
-              </Button>
-            )}
             <Button
               variant="danger"
               size="sm"
@@ -406,85 +373,6 @@ export function TaskDialog({
               />
             </FieldShell>
           </label>
-        </div>
-
-        <div>
-          <FieldLabel>Priority</FieldLabel>
-          {/* The same pills the card wears, not a segmented control. Priority is a
-              pill everywhere else in the app — on the card, and in the dropdown
-              that pill opens — so a four-across bar with a sliding white segment
-              was the one place it looked like a different setting entirely. The
-              chosen one takes its own colour straight from `PRIORITY_STYLES.pill`,
-              which is the card's class, and the rest sit quiet in the same shape
-              as the context pills below. */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {PRIORITIES.map((priority) => {
-              const on = draft.priority === priority;
-              return (
-                <button
-                  key={priority}
-                  type="button"
-                  onClick={() => setDraft((d) => ({ ...d, priority }))}
-                  className={cn(
-                    PILL,
-                    "transition-colors",
-                    on
-                      ? PRIORITY_STYLES[priority].pill
-                      : "bg-transparent text-ink-faint ring-hairline hover:text-ink",
-                  )}
-                >
-                  <PriorityBars
-                    level={priority}
-                    className={cn(
-                      "size-3.5",
-                      on ? PRIORITY_STYLES[priority].chip : "text-ink-ghost",
-                    )}
-                  />
-                  {PRIORITY_STYLES[priority].label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div>
-          <FieldLabel>Contexts</FieldLabel>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {contexts.map((context) => {
-              const Icon = contextIcon(context.name);
-              const on = draft.contextIds.includes(context.id);
-              return (
-                <button
-                  key={context.id}
-                  type="button"
-                  onClick={() =>
-                    setDraft((d) => ({
-                      ...d,
-                      contextIds: on
-                        ? d.contextIds.filter((id) => id !== context.id)
-                        : [...d.contextIds, context.id],
-                    }))
-                  }
-                  className={cn(
-                    PILL,
-                    "transition-colors",
-                    on
-                      ? "bg-panel-raised text-ink ring-hairline-strong"
-                      : "bg-transparent text-ink-faint ring-hairline hover:text-ink",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "mr-0.5 size-1.5 rounded-full",
-                      labelColor(context.color).dot,
-                    )}
-                  />
-                  <Icon className="size-3.5 opacity-70" />
-                  {context.name}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
         <div>

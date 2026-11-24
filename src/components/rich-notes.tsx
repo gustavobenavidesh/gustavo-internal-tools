@@ -296,7 +296,7 @@ export function RichNotes({
             );
             sync();
           }}
-          className="rich-text min-h-[8.5rem] px-4.5 pb-4.5 pt-4 text-sm leading-relaxed text-ink outline-none"
+          className="rich-text min-h-[14rem] px-4.5 pb-4.5 pt-4 text-sm leading-relaxed text-ink outline-none"
         />
       </div>
     </div>
