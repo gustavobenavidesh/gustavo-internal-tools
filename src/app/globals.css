@@ -637,40 +637,6 @@ body::before {
   }
 }
 
-/* The board meets the viewport on the right and bottom, so only its top-left
-   corner follows the shared smoothing curve. Paint behind the content to keep
-   fixed drag overlays outside the clip path. */
-@utility board-surface {
-  background: var(--color-hairline-mid);
-  --sq-radius: var(--corner-board);
-  --sq-c: calc(var(--sq-radius) * var(--corner-smooth));
-  clip-path: shape(
-    from 0 var(--sq-radius),
-    curve to var(--sq-radius) 0 with 0 var(--sq-c) / var(--sq-c) 0,
-    line to 100% 0,
-    line to 100% 100%,
-    line to 0 100%,
-    close
-  );
-
-  &::before {
-    content: "";
-    position: absolute;
-    inset: 1px 0 0 1px;
-    background: var(--color-surface);
-    --sq-ir: calc(var(--sq-radius) - 1px);
-    --sq-ic: calc(var(--sq-ir) * var(--corner-smooth));
-    clip-path: shape(
-      from 0 var(--sq-ir),
-      curve to var(--sq-ir) 0 with 0 var(--sq-ic) / var(--sq-ic) 0,
-      line to 100% 0,
-      line to 100% 100%,
-      line to 0 100%,
-      close
-    );
-  }
-}
-
 /**
  * Holds a `squircle-surface` behind an element's content, and carries its shadow.
  *
@@ -752,16 +718,29 @@ body::before {
     list-style-type: decimal;
   }
 
+  /* Native editing may nest a list directly inside another list rather than
+     inside an li, so match either structure. */
+  & :is(ul, ol) ul {
+    list-style-type: circle;
+  }
+
+  & :is(ul, ol) ol {
+    list-style-type: lower-alpha;
+  }
+
+  & :is(ul, ol) ol > li::marker {
+    content: counter(list-item, lower-alpha) ") ";
+  }
+
   & li::marker {
     color: var(--color-ink-ghost);
   }
 
-  & blockquote {
-    margin: 0.35rem 0;
-    padding-left: 0.7rem;
-    border-left: 2px solid var(--color-hairline-strong);
-    color: var(--color-ink-soft);
+  & ol > li::marker {
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+      sans-serif;
   }
+
 
   & a {
     color: var(--color-accent-ink);

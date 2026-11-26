@@ -1380,8 +1380,21 @@ export function BoardView({
         <div className="relative flex min-h-0 flex-1 flex-col">
           <div
             aria-hidden
-            className="board-surface pointer-events-none absolute inset-0"
-          />
+            className="pointer-events-none absolute inset-0 overflow-hidden"
+          >
+            {/* Extend the other corners past the viewport so only the top-left
+                corner is rounded, using the shared surface renderer. */}
+            <div
+              className="squircle-surface h-[calc(100%+var(--corner-board))] w-[calc(100%+var(--corner-board))]"
+              style={
+                {
+                  "--sq-radius": "var(--corner-board)",
+                  "--sq-face": "var(--color-surface)",
+                  "--sq-edge": "var(--color-hairline-mid)",
+                } as CSSProperties
+              }
+            />
+          </div>
           <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-tl-[var(--corner-board)]">
           {/* Floats over the board's bottom-right corner. Outside the DnD context
               on purpose: it isn't part of the drag surface, and a textarea inside

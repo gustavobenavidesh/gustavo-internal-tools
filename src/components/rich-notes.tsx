@@ -7,7 +7,6 @@ import {
   List,
   ListOrdered,
   type LucideIcon,
-  Quote,
   Strikethrough,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -50,13 +49,6 @@ const TOOLS: Tool[] = [
     label: "Numbered list",
     command: "insertOrderedList",
     key: "⇧⌘7",
-  },
-  {
-    icon: Quote,
-    label: "Quote",
-    command: "formatBlock",
-    value: () => "blockquote",
-    key: "⇧⌘9",
   },
   {
     icon: Link2,
@@ -106,13 +98,11 @@ const TOOLS: Tool[] = [
 const SHORTCUTS: Record<string, [string, string?]> = {
   Digit8: ["insertUnorderedList"],
   Digit7: ["insertOrderedList"],
-  Digit9: ["formatBlock", "blockquote"],
 };
 
 const MARKERS: Array<[RegExp, string, string?]> = [
   [/^[-*+]$/, "insertUnorderedList"],
   [/^1[.)]$/, "insertOrderedList"],
-  [/^>$/, "formatBlock", "blockquote"],
   [/^#$/, "formatBlock", "h3"],
   [/^```$/, "formatBlock", "pre"],
 ];
@@ -149,6 +139,18 @@ function expandMarker(): boolean {
 function isBlank(el: HTMLElement) {
   if (el.textContent?.trim()) return false;
   return !el.querySelector("li, blockquote, img, table");
+}
+
+function selectionIsInEditorList(editor: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection?.anchorNode || !selection.focusNode) return false;
+
+  return [selection.anchorNode, selection.focusNode].every((node) => {
+    const element =
+      node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+    const listItem = element?.closest("li");
+    return !!listItem && editor.contains(listItem);
+  });
 }
 
 export function RichNotes({
@@ -266,6 +268,21 @@ export function RichNotes({
           onInput={sync}
           onBlur={sync}
           onKeyDown={(e) => {
+            if (
+              e.key === "Tab" &&
+              !e.metaKey &&
+              !e.ctrlKey &&
+              !e.altKey &&
+              !e.nativeEvent.isComposing &&
+              editor.current &&
+              selectionIsInEditorList(editor.current)
+            ) {
+              e.preventDefault();
+              document.execCommand(e.shiftKey ? "outdent" : "indent");
+              sync();
+              readState();
+              return;
+            }
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
               onSave();
